@@ -1,4 +1,5 @@
 import os
+import io
 import asyncio
 from threading import Thread
 from flask import Flask
@@ -7,7 +8,6 @@ from discord.ext import commands
 from dotenv import load_dotenv
 import google.generativeai as genai
 from PIL import Image
-import io
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
