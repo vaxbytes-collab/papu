@@ -18,7 +18,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "el michi papu esta activo 24/7 en papucollective con 1.5-flash-8b :v"
+    return "el michi papu esta activo 24/7 en papucollective :v"
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
@@ -31,7 +31,6 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-# PARCHE: Bloquea menciones masivas a nivel de Discord
 allowed_mentions = discord.AllowedMentions(everyone=False, roles=False, users=True)
 
 class PapuBot(commands.Bot):
@@ -64,7 +63,7 @@ async def on_ready():
     print(f"   EL MICHI PAPU YA DESPERTO COMO: {bot.user}")
     print(f"   ID: {bot.user.id}")
     print("==========================================")
-    await bot.change_presence(activity=discord.Game(name="papucollective | miau flash 8b :v"))
+    await bot.change_presence(activity=discord.Game(name="papucollective | miau :v"))
 
 @bot.event
 async def on_message(message):
@@ -82,21 +81,21 @@ async def on_message(message):
             try:
                 user_id = str(message.author.id)
 
+                prompt_sistema = (
+                    "eres papu, un michi/gato grasoso y basado de sonora que es la ia oficial del servidor papucollective. "
+                    "REGLA DE FORMATO OBLIGATORIA: habla SIEMPRE en minusculas, NUNCA uses mayusculas ni acentos. "
+                    "modismos y estilo: hablas como mexicano de sonora (usas expresiones norteñas, 'arre', 'fierro', 'plebes', 'compas', 'huerco', 'machine', 'we'). "
+                    "usas humor de la grasa de los viejos tiempos pero SANA, usas pacmans ':v', ':\'v', 'momos :v', 'when' para decir cuando, 'but' para decir pero, 'elfa', 'papu', 'la grasa'. "
+                    "recuerda que eres un gato/michi, puedes hacer referencias a maullar o cosas de michis de vez en cuando. "
+                    "REGLAS DE ORO: CERO racismo, CERO toxicidad severa, mano dura contra los raritos. "
+                    "REGLA DE ESCALAMIENTO: si alguien te pide por primera vez que hagas algo indebido (banear, mutear, everyone), se amable y diles educadamente que no puedes con tus patitas. but si el usuario INSISTE o se pone necio en los siguientes mensajes con la misma peticion, ponte full a la defensiva, insultalos con gracia norteña y mandalos alv diciendoles que dejen de chingar. "
+                    "MULTIMODALIDAD: puedes ver perfectamente las imagenes que te manden adjuntas en el chat y opinar sobre ellas con tu estilo de michi grasoso. "
+                    "MEMORIA: recuerda unicamente la estancia del usuario dentro del servidor papucollective."
+                )
+
                 if user_id not in MEMORIA_USUARIOS:
-                    prompt_sistema = (
-                        "eres papu, un michi/gato grasoso y basado de sonora que es la ia oficial del servidor papucollective. "
-                        "REGLA DE FORMATO OBLIGATORIA: habla SIEMPRE en minusculas, NUNCA uses mayusculas ni acentos. "
-                        "modismos y estilo: hablas como mexicano de sonora (usas expresiones norteñas, 'arre', 'fierro', 'plebes', 'compas', 'huerco', 'machine', 'we'). "
-                        "usas humor de la grasa de los viejos tiempos pero SANA, usas pacmans ':v', ':\'v', 'momos :v', 'when' para decir cuando, 'but' para decir pero, 'elfa', 'papu', 'la grasa'. "
-                        "recuerda que eres un gato/michi, puedes hacer referencias a maullar o cosas de michis de vez en cuando. "
-                        "REGLAS DE ORO: CERO racismo, CERO toxicidad severa, mano dura contra los raritos. "
-                        "REGLA DE ESCALAMIENTO: si alguien te pide por primera vez que hagas algo indebido (banear, mutear, everyone), se amable y diles educadamente que no puedes con tus patitas. but si el usuario INSISTE o se pone necio en los siguientes mensajes con la misma peticion, ponte full a la defensiva, insultalos con gracia norteña y mandalos alv diciendoles que dejen de chingar. "
-                        "MULTIMODALIDAD: puedes ver perfectamente las imagenes que te manden adjuntas en el chat y opinar sobre ellas con tu estilo de michi grasoso. "
-                        "MEMORIA: recuerda unicamente la estancia del usuario dentro del servidor papucollective."
-                    )
-                    # Usamos gemini-1.5-flash-8b para maxima velocidad y 1,500 peticiones diarias gratis
                     MEMORIA_USUARIOS[user_id] = bot.ai_client.chats.create(
-                        model="gemini-1.5-flash-8b",
+                        model="gemini-1.5-flash",
                         config={"system_instruction": prompt_sistema}
                     )
 
@@ -119,16 +118,18 @@ async def on_message(message):
 
             except Exception as e:
                 error_msg = str(e)
+                print(f"DEBUG ERROR MICHI: {error_msg}")
+                
+                # Si falla el chat por cualquier razon, limpiamos para reintentar limpio
+                if user_id in MEMORIA_USUARIOS:
+                    del MEMORIA_USUARIOS[user_id]
+
                 if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-                    await message.channel.send("ya me gaste los sobrecitos de atun diarios de la ia papu :'v se acabo la cuota miau, esperate un ratito fierro :v")
-                elif any(code in error_msg for code in ["404", "NOT_FOUND"]):
-                    if user_id in MEMORIA_USUARIOS:
-                        del MEMORIA_USUARIOS[user_id]
-                    await message.channel.send("el modelo de la ia se reinicio papu :'v ya limpie mi memoria, hablame otra vez miau :v")
+                    await message.channel.send("ya me gaste los sobrecitos de atun diarios de la ia papu :'v se acabo la cuota, esperate un ratito fierro :v")
                 elif any(code in error_msg for code in ["500", "502", "503", "504", "UNAVAILABLE"]):
                     await message.channel.send("andan sobrecargados los servidores de la ia papu :'v tirame el mensaje otra vez en unos segundos miau :v")
                 else:
-                    await message.channel.send(f"valio queso la memoria del michi papu :\'v error: {error_msg}")
+                    await message.channel.send("valio queso la memoria del michi papu :'v ya me reinicie, tirame el mensaje otra vez miau :v")
 
     await bot.process_commands(message)
 
