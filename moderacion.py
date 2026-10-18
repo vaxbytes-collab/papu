@@ -153,7 +153,7 @@ class Moderacion(commands.Cog):
                 f"Texto a analizar: {texto}"
             )
             response = self.bot.ai_client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3.8-flash",
                 contents=prompt
             )
             await interaction.followup.send(f"🛡️ **Análisis de seguridad IA:**\n{response.text}")

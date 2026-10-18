@@ -87,7 +87,7 @@ async def on_message(message):
                         "sus interacciones en la comunidad, roles, anécdotas del chat y convivencia del server."
                     )
                     MEMORIA_USUARIOS[user_id] = bot.ai_client.chats.create(
-                        model="gemini-2.5-flash",
+                        model="gemini-3.8-flash",
                         config={"system_instruction": prompt_sistema}
                     )
 
