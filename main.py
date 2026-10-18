@@ -75,7 +75,7 @@ async def on_ready():
     print(f"   EL MICHI PAPU YA DESPERTO CON GROQ: {bot.user}")
     print(f"   ID: {bot.user.id}")
     print("==========================================")
-    await bot.change_presence(activity=discord.Game(name="papucollective | meta-llama :v"))
+    await bot.change_presence(activity=discord.Game(name="papucollective | sudo apagate :v"))
 
 @bot.event
 async def on_message(message):
@@ -101,9 +101,9 @@ async def on_message(message):
                 texto_usuario = contenido if contenido else "mira esta imagen papu :v"
                 HISTORIALES_USUARIOS[user_id].append({"role": "user", "content": texto_usuario})
 
-                # Usamos el nombre técnico exacto de la tabla oficial de Groq
+                # Modelo exacto de alta velocidad y 14k RPD en Groq
                 response = bot.groq_client.chat.completions.create(
-                    model="meta-llama/Llama-3.1-8b-Instruct",
+                    model="llama-3.1-8b-instant",
                     messages=HISTORIALES_USUARIOS[user_id],
                     temperature=0.7,
                     max_tokens=1024
