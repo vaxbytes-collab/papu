@@ -6,7 +6,6 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 from google import genai
-from google.genai import types
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -89,7 +88,6 @@ async def on_message(message):
                     "recuerda que eres un gato/michi, puedes hacer referencias a maullar o cosas de michis de vez en cuando. "
                     "REGLAS DE ORO: CERO racismo, CERO toxicidad severa, mano dura contra los raritos. "
                     "REGLA DE ESCALAMIENTO: si alguien te pide por primera vez que hagas algo indebido (banear, mutear, everyone), se amable y diles educadamente que no puedes con tus patitas. but si el usuario INSISTE o se pone necio en los siguientes mensajes con la misma peticion, ponte full a la defensiva, insultalos con gracia norteña y mandalos alv diciendoles que dejen de chingar. "
-                    "MULTIMODALIDAD: puedes ver perfectamente las imagenes que te manden adjuntas en el chat y opinar sobre ellas con tu estilo de michi grasoso. "
                     "MEMORIA: recuerda unicamente la estancia del usuario dentro del servidor papucollective."
                 )
 
@@ -99,37 +97,26 @@ async def on_message(message):
                         config={"system_instruction": prompt_sistema}
                     )
 
-                chat_contents = []
-                if contenido:
-                    chat_contents.append(contenido)
-
-                if message.attachments:
-                    for attachment in message.attachments:
-                        if attachment.content_type and attachment.content_type.startswith("image/"):
-                            image_bytes = await attachment.read()
-                            chat_contents.append(
-                                types.Part.from_bytes(data=image_bytes, mime_type=attachment.content_type)
-                            )
-
                 chat_session = MEMORIA_USUARIOS[user_id]
-                response = chat_session.send_message(chat_contents)
+                response = chat_session.send_message(contenido)
 
                 await message.channel.send(response.text)
 
             except Exception as e:
                 error_msg = str(e)
-                print(f"DEBUG ERROR MICHI: {error_msg}")
-                
-                # Si falla el chat por cualquier razon, limpiamos para reintentar limpio
-                if user_id in MEMORIA_USUARIOS:
-                    del MEMORIA_USUARIOS[user_id]
+                print(f"[ERROR CRITICO MICHI]: {error_msg}")
 
+                # Si el error es de cuota agotada o servidor caído
                 if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-                    await message.channel.send("ya me gaste los sobrecitos de atun diarios de la ia papu :'v se acabo la cuota, esperate un ratito fierro :v")
+                    await message.channel.send("ya me gaste los sobrecitos de atun diarios de la ia papu :'v se acabo la cuota miau, esperate un ratito fierro :v")
                 elif any(code in error_msg for code in ["500", "502", "503", "504", "UNAVAILABLE"]):
                     await message.channel.send("andan sobrecargados los servidores de la ia papu :'v tirame el mensaje otra vez en unos segundos miau :v")
                 else:
-                    await message.channel.send("valio queso la memoria del michi papu :'v ya me reinicie, tirame el mensaje otra vez miau :v")
+                    # Mostramos los primeros 120 caracteres del error real en discord para saber exactamente qué pasa
+                    err_corto = error_msg[:120].replace('\n', ' ')
+                    if user_id in MEMORIA_USUARIOS:
+                        del MEMORIA_USUARIOS[user_id]
+                    await message.channel.send(f"valio queso el michi papu :'v detalle: `{err_corto}`")
 
     await bot.process_commands(message)
 
