@@ -75,7 +75,7 @@ async def on_ready():
     print(f"   EL MICHI PAPU YA DESPERTO CON GROQ: {bot.user}")
     print(f"   ID: {bot.user.id}")
     print("==========================================")
-    await bot.change_presence(activity=discord.Game(name="papucollective | groq 8b :v"))
+    await bot.change_presence(activity=discord.Game(name="papucollective | meta-llama :v"))
 
 @bot.event
 async def on_message(message):
@@ -101,9 +101,9 @@ async def on_message(message):
                 texto_usuario = contenido if contenido else "mira esta imagen papu :v"
                 HISTORIALES_USUARIOS[user_id].append({"role": "user", "content": texto_usuario})
 
-                # Usamos llama-3.1-8b-instant que es el modelo estandar de alta disponibilidad en Groq
+                # Usamos el nombre técnico exacto de la tabla oficial de Groq
                 response = bot.groq_client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model="meta-llama/Llama-3.1-8b-Instruct",
                     messages=HISTORIALES_USUARIOS[user_id],
                     temperature=0.7,
                     max_tokens=1024
