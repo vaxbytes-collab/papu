@@ -18,7 +18,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "el michi papu esta activo 24/7 en papucollective :v"
+    return "el michi papu esta activo 24/7 en papucollective con 1.5-flash-8b :v"
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
@@ -31,6 +31,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
+# PARCHE: Bloquea menciones masivas a nivel de Discord
 allowed_mentions = discord.AllowedMentions(everyone=False, roles=False, users=True)
 
 class PapuBot(commands.Bot):
@@ -63,7 +64,7 @@ async def on_ready():
     print(f"   EL MICHI PAPU YA DESPERTO COMO: {bot.user}")
     print(f"   ID: {bot.user.id}")
     print("==========================================")
-    await bot.change_presence(activity=discord.Game(name="papucollective | miau con fotitos :v"))
+    await bot.change_presence(activity=discord.Game(name="papucollective | miau flash 8b :v"))
 
 @bot.event
 async def on_message(message):
@@ -93,9 +94,9 @@ async def on_message(message):
                         "MULTIMODALIDAD: puedes ver perfectamente las imagenes que te manden adjuntas en el chat y opinar sobre ellas con tu estilo de michi grasoso. "
                         "MEMORIA: recuerda unicamente la estancia del usuario dentro del servidor papucollective."
                     )
-                    # Cambiado a gemini-2.0-flash para soporte de hasta 1,500 peticiones diarias
+                    # Usamos gemini-1.5-flash-8b para maxima velocidad y 1,500 peticiones diarias gratis
                     MEMORIA_USUARIOS[user_id] = bot.ai_client.chats.create(
-                        model="gemini-2.0-flash",
+                        model="gemini-1.5-flash-8b",
                         config={"system_instruction": prompt_sistema}
                     )
 
@@ -119,7 +120,11 @@ async def on_message(message):
             except Exception as e:
                 error_msg = str(e)
                 if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-                    await message.channel.send("ya me gaste los sobrecitos de atun diarios de la ia papu :'v se acabo la cuota de peticiones miau, esperate un ratito fierro :v")
+                    await message.channel.send("ya me gaste los sobrecitos de atun diarios de la ia papu :'v se acabo la cuota miau, esperate un ratito fierro :v")
+                elif any(code in error_msg for code in ["404", "NOT_FOUND"]):
+                    if user_id in MEMORIA_USUARIOS:
+                        del MEMORIA_USUARIOS[user_id]
+                    await message.channel.send("el modelo de la ia se reinicio papu :'v ya limpie mi memoria, hablame otra vez miau :v")
                 elif any(code in error_msg for code in ["500", "502", "503", "504", "UNAVAILABLE"]):
                     await message.channel.send("andan sobrecargados los servidores de la ia papu :'v tirame el mensaje otra vez en unos segundos miau :v")
                 else:
