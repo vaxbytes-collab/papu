@@ -6,20 +6,20 @@ from flask import Flask
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
-import google.generativeai as genai
+from groq import Groq
 from PIL import Image
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-genai.configure(api_key=GEMINI_API_KEY)
+groq_client = Groq(api_key=GROQ_API_KEY)
 
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "el michi papu esta activo 24/7 en papucollective con 1,500 RPD :v"
+    return "el michi papu esta activo 24/7 en papucollective con groq y llama 3.1 :v"
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
@@ -37,6 +37,7 @@ allowed_mentions = discord.AllowedMentions(everyone=False, roles=False, users=Tr
 class PapuBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents, allowed_mentions=allowed_mentions)
+        self.groq_client = groq_client
 
     async def setup_hook(self):
         cogs = ["cogs.moderacion", "cogs.entretenimiento"]
@@ -55,15 +56,26 @@ class PapuBot(commands.Bot):
 
 bot = PapuBot()
 
-MEMORIA_USUARIOS = {}
+HISTORIALES_USUARIOS = {}
+
+PROMPT_SISTEMA = (
+    "eres papu, un michi/gato grasoso y basado de sonora que es la ia oficial del servidor papucollective. "
+    "REGLA DE FORMATO OBLIGATORIA: habla SIEMPRE en minusculas, NUNCA uses mayusculas ni acentos. "
+    "modismos y estilo: hablas como mexicano de sonora (usas expresiones norteñas, 'arre', 'fierro', 'plebes', 'compas', 'huerco', 'machine', 'we'). "
+    "usas humor de la grasa de los viejos tiempos pero SANA, usas pacmans ':v', ':\'v', 'momos :v', 'when' para decir cuando, 'but' para decir pero, 'elfa', 'papu', 'la grasa'. "
+    "recuerda que eres un gato/michi, puedes hacer referencias a maullar o cosas de michis de vez en cuando. "
+    "REGLAS DE ORO: CERO racismo, CERO toxicidad severa, mano dura contra los raritos. "
+    "REGLA DE ESCALAMIENTO: si alguien te pide por primera vez que hagas algo indebido (banear, mutear, everyone), se amable y diles educadamente que no puedes con tus patitas. but si el usuario INSISTE o se pone necio en los siguientes mensajes con la misma peticion, ponte full a la defensiva, insultalos con gracia norteña y mandalos alv diciendoles que dejen de chingar. "
+    "MEMORIA: recuerda unicamente la estancia del usuario dentro del servidor papucollective."
+)
 
 @bot.event
 async def on_ready():
     print("==========================================")
-    print(f"   EL MICHI PAPU YA DESPERTO COMO: {bot.user}")
+    print(f"   EL MICHI PAPU YA DESPERTO CON GROQ: {bot.user}")
     print(f"   ID: {bot.user.id}")
     print("==========================================")
-    await bot.change_presence(activity=discord.Game(name="papucollective | miau 1500 rpd :v"))
+    await bot.change_presence(activity=discord.Game(name="papucollective | 14k rpd groq :v"))
 
 @bot.event
 async def on_message(message):
@@ -81,55 +93,43 @@ async def on_message(message):
             try:
                 user_id = str(message.author.id)
 
-                prompt_sistema = (
-                    "eres papu, un michi/gato grasoso y basado de sonora que es la ia oficial del servidor papucollective. "
-                    "REGLA DE FORMATO OBLIGATORIA: habla SIEMPRE en minusculas, NUNCA uses mayusculas ni acentos. "
-                    "modismos y estilo: hablas como mexicano de sonora (usas expresiones norteñas, 'arre', 'fierro', 'plebes', 'compas', 'huerco', 'machine', 'we'). "
-                    "usas humor de la grasa de los viejos tiempos pero SANA, usas pacmans ':v', ':\'v', 'momos :v', 'when' para decir cuando, 'but' para decir pero, 'elfa', 'papu', 'la grasa'. "
-                    "recuerda que eres un gato/michi, puedes hacer referencias a maullar o cosas de michis de vez en cuando. "
-                    "REGLAS DE ORO: CERO racismo, CERO toxicidad severa, mano dura contra los raritos. "
-                    "REGLA DE ESCALAMIENTO: si alguien te pide por primera vez que hagas algo indebido (banear, mutear, everyone), se amable y diles educadamente que no puedes con tus patitas. but si el usuario INSISTE o se pone necio en los siguientes mensajes con la misma peticion, ponte full a la defensiva, insultalos con gracia norteña y mandalos alv diciendoles que dejen de chingar. "
-                    "MULTIMODALIDAD: puedes ver perfectamente las imagenes que te manden adjuntas en el chat y opinar sobre ellas con tu estilo de michi grasoso. "
-                    "MEMORIA: recuerda unicamente la estancia del usuario dentro del servidor papucollective."
+                if user_id not in HISTORIALES_USUARIOS:
+                    HISTORIALES_USUARIOS[user_id] = [
+                        {"role": "system", "content": PROMPT_SISTEMA}
+                    ]
+
+                texto_usuario = contenido if contenido else "mira esta imagen papu :v"
+                HISTORIALES_USUARIOS[user_id].append({"role": "user", "content": texto_usuario})
+
+                # Usamos llama-3.1-8b-instant con los 14,400 RPD masivos de Groq
+                response = bot.groq_client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=HISTORIALES_USUARIOS[user_id],
+                    temperature=0.7,
+                    max_tokens=1024
                 )
 
-                if user_id not in MEMORIA_USUARIOS:
-                    model = genai.GenerativeModel(
-                        model_name="gemini-1.5-flash",
-                        system_instruction=prompt_sistema
-                    )
-                    MEMORIA_USUARIOS[user_id] = model.start_chat(history=[])
+                respuesta_texto = response.choices[0].message.content
 
-                chat_inputs = []
-                if contenido:
-                    chat_inputs.append(contenido)
+                HISTORIALES_USUARIOS[user_id].append({"role": "assistant", "content": respuesta_texto})
 
-                if message.attachments:
-                    for attachment in message.attachments:
-                        if attachment.content_type and attachment.content_type.startswith("image/"):
-                            image_bytes = await attachment.read()
-                            img = Image.open(io.BytesIO(image_bytes))
-                            chat_inputs.append(img)
+                # Mantenemos el historial limpio con los ultimos 15 mensajes
+                if len(HISTORIALES_USUARIOS[user_id]) > 16:
+                    HISTORIALES_USUARIOS[user_id] = [HISTORIALES_USUARIOS[user_id][0]] + HISTORIALES_USUARIOS[user_id][-15:]
 
-                chat_session = MEMORIA_USUARIOS[user_id]
-                response = chat_session.send_message(chat_inputs)
-
-                await message.channel.send(response.text)
+                await message.channel.send(respuesta_texto)
 
             except Exception as e:
                 error_msg = str(e)
-                print(f"[ERROR CRITICO MICHI]: {error_msg}")
+                print(f"[ERROR CRITICO GROQ]: {error_msg}")
+                if user_id in HISTORIALES_USUARIOS:
+                    del HISTORIALES_USUARIOS[user_id]
 
-                if user_id in MEMORIA_USUARIOS:
-                    del MEMORIA_USUARIOS[user_id]
-
-                if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-                    await message.channel.send("ya me gaste los sobrecitos de atun diarios de la ia papu :'v se acabo la cuota miau, esperate un ratito fierro :v")
-                elif any(code in error_msg for code in ["500", "502", "503", "504", "UNAVAILABLE"]):
-                    await message.channel.send("andan sobrecargados los servidores de la ia papu :'v tirame el mensaje otra vez en unos segundos miau :v")
+                if "429" in error_msg or "rate_limit" in error_msg.lower():
+                    await message.channel.send("andamos a tope de velocidad con groq papu :'v esperate unos segundos y me tiras mensaje otra vez fierro :v")
                 else:
                     err_corto = error_msg[:120].replace('\n', ' ')
-                    await message.channel.send(f"valio queso el michi papu :'v detalle: `{err_corto}`")
+                    await message.channel.send(f"valio queso el michi en groq :'v detalle: `{err_corto}`")
 
     await bot.process_commands(message)
 
