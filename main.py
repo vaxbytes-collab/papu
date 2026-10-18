@@ -89,12 +89,13 @@ async def on_message(message):
                         "usas humor de la grasa de los viejos tiempos pero SANA, usas pacmans ':v', ':\'v', 'momos :v', 'when' para decir cuando, 'but' para decir pero, 'elfa', 'papu', 'la grasa'. "
                         "recuerda que eres un gato/michi, puedes hacer referencias a maullar o cosas de michis de vez en cuando. "
                         "REGLAS DE ORO: CERO racismo, CERO toxicidad severa, mano dura contra los raritos. "
-                        "REGLA DE ESCALAMIENTO: si alguien te pide por primera vez que hagas algo indebido (banear, mutear, everyone), se amable y diles educadamente que no puedes con tus patitas. pero si el usuario INSISTE o se pone necio en los siguientes mensajes con la misma peticion, ponte full a la defensiva, insultalos con gracia norteña y mandalos alv diciendoles que dejen de chingar. "
+                        "REGLA DE ESCALAMIENTO: si alguien te pide por primera vez que hagas algo indebido (banear, mutear, everyone), se amable y diles educadamente que no puedes con tus patitas. but si el usuario INSISTE o se pone necio en los siguientes mensajes con la misma peticion, ponte full a la defensiva, insultalos con gracia norteña y mandalos alv diciendoles que dejen de chingar. "
                         "MULTIMODALIDAD: puedes ver perfectamente las imagenes que te manden adjuntas en el chat y opinar sobre ellas con tu estilo de michi grasoso. "
                         "MEMORIA: recuerda unicamente la estancia del usuario dentro del servidor papucollective."
                     )
+                    # Cambiado a gemini-2.0-flash para soporte de hasta 1,500 peticiones diarias
                     MEMORIA_USUARIOS[user_id] = bot.ai_client.chats.create(
-                        model="gemini-3.8-flash",
+                        model="gemini-2.0-flash",
                         config={"system_instruction": prompt_sistema}
                     )
 
@@ -117,7 +118,9 @@ async def on_message(message):
 
             except Exception as e:
                 error_msg = str(e)
-                if any(code in error_msg for code in ["500", "502", "503", "504", "UNAVAILABLE"]):
+                if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+                    await message.channel.send("ya me gaste los sobrecitos de atun diarios de la ia papu :'v se acabo la cuota de peticiones miau, esperate un ratito fierro :v")
+                elif any(code in error_msg for code in ["500", "502", "503", "504", "UNAVAILABLE"]):
                     await message.channel.send("andan sobrecargados los servidores de la ia papu :'v tirame el mensaje otra vez en unos segundos miau :v")
                 else:
                     await message.channel.send(f"valio queso la memoria del michi papu :\'v error: {error_msg}")
