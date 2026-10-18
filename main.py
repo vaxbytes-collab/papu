@@ -19,7 +19,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "el michi papu esta activo 24/7 en papucollective con groq y llama 3.1 :v"
+    return "el michi papu esta activo 24/7 en papucollective con groq :v"
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
@@ -75,7 +75,7 @@ async def on_ready():
     print(f"   EL MICHI PAPU YA DESPERTO CON GROQ: {bot.user}")
     print(f"   ID: {bot.user.id}")
     print("==========================================")
-    await bot.change_presence(activity=discord.Game(name="papucollective | 14k rpd groq :v"))
+    await bot.change_presence(activity=discord.Game(name="papucollective | groq versatile :v"))
 
 @bot.event
 async def on_message(message):
@@ -101,9 +101,9 @@ async def on_message(message):
                 texto_usuario = contenido if contenido else "mira esta imagen papu :v"
                 HISTORIALES_USUARIOS[user_id].append({"role": "user", "content": texto_usuario})
 
-                # Usamos llama-3.1-8b-instant con los 14,400 RPD masivos de Groq
+                # Usamos llama-3.3-70b-versatile que esta activo y oficial en Groq
                 response = bot.groq_client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model="llama-3.3-70b-versatile",
                     messages=HISTORIALES_USUARIOS[user_id],
                     temperature=0.7,
                     max_tokens=1024
