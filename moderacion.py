@@ -138,6 +138,32 @@ class Moderacion(commands.Cog):
             print("[WARN] Fallo el analisis de IA", exc_info=True)
             return None
 
+    def should_reply_without_mention(self, message):
+        """Solo responde sin mencion en el canal opt-in configurado por un admin."""
+        if message.guild is None or message.author.bot:
+            return False
+        settings = self.settings.get(self.guild_key(message.guild), {})
+        channel_id = settings.get("chat_channel")
+        return bool(channel_id and int(channel_id) == message.channel.id)
+
+    @app_commands.command(name="canal_chat", description="Configura el canal donde Papu responde sin mencion")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def canal_chat(self, interaction: discord.Interaction, canal: discord.TextChannel = None):
+        key = self.guild_key(interaction.guild)
+        self.settings.setdefault(key, {})
+        if canal is None:
+            self.settings[key].pop("chat_channel", None)
+            message = "Respuestas automaticas desactivadas; Papu respondera cuando lo menciones."
+        else:
+            perms = canal.permissions_for(interaction.guild.me)
+            if not (perms.view_channel and perms.send_messages and perms.read_message_history):
+                return await interaction.response.send_message("Necesito ver el canal, leer historial y enviar mensajes.", ephemeral=True)
+            self.settings[key]["chat_channel"] = canal.id
+            message = f"Papu respondera sin mencion en {canal.mention}."
+        save_json(SETTINGS_FILE, self.settings)
+        await interaction.response.send_message(message, ephemeral=True)
+        await self.log(interaction.guild, "⚙️ Canal de chat configurado", message)
+
     async def check_message(self, message):
         key = (message.guild.id, message.author.id)
         now = time.monotonic()
