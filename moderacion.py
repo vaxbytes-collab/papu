@@ -4,9 +4,7 @@ La IA nunca sanciona ni elimina mensajes por su cuenta: sus alertas requieren re
 """
 import asyncio
 import json
-import os
 import re
-import tempfile
 from datetime import timedelta
 
 import discord
@@ -14,7 +12,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from groq_config import get_groq_model
-from papu_store import DATA_DIR
+from papu_store import DATA_DIR, load_json as load_stored_json, save_json as save_stored_json
 
 LOGS_FILE = DATA_DIR / "log_channels.json"
 WARNS_FILE = DATA_DIR / "warns.json"
@@ -23,29 +21,13 @@ AI_MAX_CONCURRENT_CHECKS = 3
 
 
 def load_json(path, default):
-    try:
-        with path.open("r", encoding="utf-8") as file:
-            value = json.load(file)
-        return value if isinstance(value, type(default)) else default
-    except (OSError, json.JSONDecodeError, TypeError):
-        return default
+    """Mantiene la interfaz anterior, pero usa el backend compartido de Papu."""
+    return load_stored_json(path.name, default)
 
 
 def save_json(path, data):
-    """Escritura atomica para reducir el riesgo de corromper los datos."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp_path = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as file:
-            json.dump(data, file, ensure_ascii=False, indent=2)
-            file.flush()
-            os.fsync(file.fileno())
-        os.replace(temp_path, path)
-    finally:
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
+    """Guarda usando PostgreSQL o el almacenamiento local configurado."""
+    save_stored_json(path.name, data)
 
 
 def safe_text(value, limit=900):
