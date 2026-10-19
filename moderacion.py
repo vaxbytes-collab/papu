@@ -230,7 +230,9 @@ class Moderacion(commands.Cog):
 
     @app_commands.command(name="modcheck", description="Analiza manualmente un texto con IA")
     @app_commands.checks.has_permissions(manage_messages=True)
-    async def modcheck(self, interaction: discord.Interaction, texto: app_commands.Range[str, 1, 1800]):
+    async def modcheck(self, interaction: discord.Interaction, texto: str):
+        if not texto.strip() or len(texto) > 1800:
+            return await interaction.response.send_message("el texto debe tener entre 1 y 1800 caracteres.", ephemeral=True)
         await interaction.response.defer(ephemeral=True, thinking=True)
         result = await self.classify(texto)
         if result is None:
