@@ -398,7 +398,7 @@ class Seguridad(commands.Cog):
         referenced_channel = interaction.channel
         if enlace_mensaje:
             match = re.fullmatch(
-                r"https://(?:(?:ptb|canary)\\.)?discord\\.com/channels/(\\d+)/(\\d+)/(\\d+)",
+                r"https://(?:(?:ptb|canary)\.)?discord\.com/channels/(\d+)/(\d+)/(\d+)",
                 enlace_mensaje.strip(),
             )
             if not match or int(match.group(1)) != interaction.guild_id:
