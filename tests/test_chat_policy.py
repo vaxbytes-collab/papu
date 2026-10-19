@@ -58,7 +58,7 @@ class ChatPolicyTests(unittest.TestCase):
             last_assistant_message="tracklist oficial: 1. welcome to america 2. ultra 3. real nice",
         )
         self.assertIsNotNone(answer)
-        self.assertIn("que me llego", answer)
+        self.assertIn("nomas me llego", answer)
 
     def test_number_is_allowed_as_selection_only_after_explicit_prompt(self):
         answer = deterministic_chat_reply(
