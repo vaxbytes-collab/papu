@@ -100,5 +100,49 @@ class Entretenimiento(commands.Cog):
             embed.set_thumbnail(url=guild.icon.url)
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="dilema", description="Te plantea un dilema divertido y sano")
+    async def dilema(self, interaction: discord.Interaction):
+        dilemas = [
+            ("Tener internet rapidisimo, pero solo en una silla", "Tener internet normalito en cualquier parte"),
+            ("Poder pausar el tiempo durante 10 segundos", "Poder rebobinar los ultimos 10 segundos una vez al dia"),
+            ("Jugar Minecraft con todos tus amigos", "Jugar tu juego favorito con todo desbloqueado"),
+            ("Tener una playlist perfecta para cada momento", "No volver a tener una cancion pegada en la cabeza"),
+            ("Que todos tus memes den risa", "Que todos tus chistes malos se vuelvan buenos"),
+            ("Vivir una semana en 2016", "Ver como sera internet en 2036"),
+            ("Tener una habitacion secreta gamer", "Tener un cine privado en casa"),
+            ("Poder hablar con los michis", "Entender cualquier idioma humano"),
+            ("Que tu juego favorito nunca tenga bugs", "Que todos sus DLC sean gratis"),
+            ("Tener un boton para encontrar cualquier objeto perdido", "Tener un boton para recordar cualquier contrasena sin verla"),
+        ]
+        a, b = random.choice(dilemas)
+        embed = discord.Embed(
+            title="🤔 dilema papu",
+            description=f"**A)** {a}\n\n**B)** {b}\n\n*elige sabiamente, papu :v*",
+            color=discord.Color.blurple(),
+        )
+        await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+
+    @app_commands.command(name="frase_michi", description="Pide una frase sabia de un michi")
+    async def frase_michi(self, interaction: discord.Interaction):
+        frases = [
+            "si cabe la cabeza, cabe el michi. la caja es un estado mental.",
+            "duerme hoy lo que puedas; mañana hay que tirar cosas de la mesa.",
+            "no persigas la productividad: persigue el rayo del sol en el suelo.",
+            "la paz interior comienza cuando aceptas que el teclado tambien es cama.",
+            "un michi no llega tarde: el tiempo humano es una sugerencia.",
+            "cuando la vida te cierre una puerta, busca una caja.",
+            "respira, toma agua y recuerda que no tienes que resolverlo todo hoy.",
+            "la curiosidad llevo al michi al laboratorio; la siesta lo saco de alli.",
+            "el verdadero lujo es una manta calentita y cero notificaciones.",
+            "no todos los dias son legendarios. hasta los michis tienen dias de mirar la pared.",
+        ]
+        embed = discord.Embed(
+            title="🐈 palabra del michi",
+            description=random.choice(frases),
+            color=discord.Color.gold(),
+        )
+        await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+
+
 async def setup(bot):
     await bot.add_cog(Entretenimiento(bot))
