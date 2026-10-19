@@ -66,7 +66,7 @@ def make_case_content(
     channel_line = f"<#{int(channel_id)}>" if channel_id else f"**{_clean(channel_name, 120, True)}**"
     if message_url and re.fullmatch(r"https://(?:(?:ptb|canary)\.)?discord\.com/channels/\d+/\d+/\d+", message_url):
         link_label = _clean(channel_name or "canal", 90, True) + "Mensaje⁠"
-        message_link = f"[{link_label}]({message_url})"
+        message_link = f"**[{link_label}]({message_url})**"
     else:
         message_link = "enlace al mensaje no disponible"
 
