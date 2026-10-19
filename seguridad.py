@@ -912,48 +912,46 @@ class Seguridad(commands.Cog):
 
         invite_cfg = cfg.get("anti_invites", {})
         if invite_cfg.get("enabled") and (contains_discord_invite(message.content) or contains_suspicious_link(message.content)):
-            try:
-                await message.delete()
-            except (discord.Forbidden, discord.HTTPException):
-                # No repitas el mensaje ni bloquees el resto de la moderacion si Discord lo rechaza.
-                await self.security_log(message.guild, f"⚠️ Detecte una invitacion en #{message.channel.name}, pero no pude borrarla.")
-                return
-            await self.security_log(
-                message.guild,
-                f"🔗 Eliminado enlace no permitido de {member} ({member.id}) en #{message.channel.name}.",
+            await self.apply_security_rule(
+                message,
+                category="enlace no permitido",
+                severity=2,
+                reason="El mensaje contiene una invitacion de Discord o un dominio de rastreo/phishing de la lista local.",
             )
             return
 
         blocked_words = cfg.get("blocked_words", [])
         if blocked_words and contains_blocked_word(message.content, blocked_words):
-            try:
-                await message.delete()
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-            await self.security_log(message.guild, f"🧰 Mensaje filtrado por regla personalizada de {member} en #{message.channel.name}.")
+            await self.apply_security_rule(
+                message,
+                category="filtro de palabras",
+                severity=2,
+                reason="El mensaje coincide con una palabra o frase bloqueada configurada por el administrador.",
+            )
             return
 
         mention_cfg = cfg.get("anti_mentions", {})
         mentions_limit = max(2, min(int(mention_cfg.get("limit", 4)), 10))
-        if mention_cfg.get("enabled") and mention_count(message) > mentions_limit:
-            try:
-                await message.delete()
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-            await self.security_log(message.guild, f"📣 Exceso de menciones de {member} en #{message.channel.name}; limite {mentions_limit}.")
+        current_mentions = mention_count(message)
+        if mention_cfg.get("enabled") and current_mentions > mentions_limit:
+            await self.apply_security_rule(
+                message,
+                category="spam de menciones",
+                severity=2,
+                reason=f"El mensaje contiene {current_mentions} menciones y supera el limite configurado de {mentions_limit}.",
+            )
             return
 
         caps_cfg = cfg.get("caps_filter", {})
-        if caps_cfg.get("enabled") and is_caps_spam(
-            message.content,
-            percent=max(60, min(int(caps_cfg.get("percent", 85)), 100)),
-            minimum=max(8, min(int(caps_cfg.get("minimum", 12)), 40)),
-        ):
-            try:
-                await message.delete()
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-            await self.security_log(message.guild, f"🔠 Mensaje con exceso de mayusculas retirado de {member} en #{message.channel.name}.")
+        caps_percent = max(60, min(int(caps_cfg.get("percent", 85)), 100))
+        caps_minimum = max(8, min(int(caps_cfg.get("minimum", 12)), 40))
+        if caps_cfg.get("enabled") and is_caps_spam(message.content, percent=caps_percent, minimum=caps_minimum):
+            await self.apply_security_rule(
+                message,
+                category="filtro de mayusculas",
+                severity=1,
+                reason=f"El mensaje supero el filtro configurado de {caps_percent}% de mayusculas con al menos {caps_minimum} letras.",
+            )
             return
 
         repeat_cfg = cfg.get("anti_repeat", {})
@@ -971,11 +969,12 @@ class Seguridad(commands.Cog):
             repeated = sum(1 for _, text in recent if text == normalized)
             if repeated >= repeat_limit:
                 recent.clear()
-                try:
-                    await message.delete()
-                except (discord.Forbidden, discord.HTTPException):
-                    pass
-                await self.security_log(message.guild, f"🔁 Mensaje repetido retirado de {member} en #{message.channel.name}; {repeat_limit} repeticiones en {window_repeat} s.")
+                await self.apply_security_rule(
+                    message,
+                    category="spam por repeticion",
+                    severity=2,
+                    reason=f"El mismo mensaje se repitio {repeat_limit} veces dentro de {window_repeat} segundos.",
+                )
                 return
 
         spam_cfg = cfg.get("anti_spam", {})
@@ -999,25 +998,12 @@ class Seguridad(commands.Cog):
             return
         self.last_spam_action[key] = now
 
-        try:
-            await message.delete()
-        except (discord.Forbidden, discord.HTTPException):
-            pass
-
-        action = "mensaje eliminado"
-        if timeout_seconds:
-            try:
-                await member.timeout(
-                    timedelta(seconds=timeout_seconds),
-                    reason=f"Anti-spam: {limit} mensajes en {window} segundos",
-                )
-                action += f" y timeout de {timeout_seconds} s"
-            except (discord.Forbidden, discord.HTTPException):
-                action += "; no pude aplicar timeout (revisa mis permisos)"
-        await self.security_log(
-            message.guild,
-            f"🚨 Anti-spam: {member} ({member.id}) en #{message.channel.name}; "
-            f"{limit} mensajes en {window} s. Accion: {action}.",
+        await self.apply_security_rule(
+            message,
+            category="anti-spam",
+            severity=2,
+            reason=f"El usuario envio {limit} mensajes en {window} segundos, alcanzando el umbral configurado.",
+            timeout_seconds=timeout_seconds,
         )
 
     @commands.Cog.listener()
