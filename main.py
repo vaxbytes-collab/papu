@@ -72,9 +72,14 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    if bot.user and bot.user in message.mentions:
-        contenido = message.content.replace(f"<@{bot.user.id}>", "")
-        contenido = contenido.replace(f"<@!{bot.user.id}>", "").strip()
+    cog = bot.get_cog("Moderacion")
+    auto_reply = bool(cog and cog.should_reply_without_mention(message))
+    if (bot.user and bot.user in message.mentions) or auto_reply:
+        contenido = message.content
+        if bot.user:
+            contenido = contenido.replace(f"<@{bot.user.id}>", "")
+            contenido = contenido.replace(f"<@!{bot.user.id}>", "")
+        contenido = contenido.strip()
         if not contenido and not message.attachments:
             await message.channel.send("ke paso papu? tirame una duda o una fotito :v")
         elif bot.groq_client is None:
