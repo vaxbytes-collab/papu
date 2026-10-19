@@ -95,9 +95,9 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 - `/userinfo`, `/serverinfo`, `/ping`.
 
 ### Protecciones automaticas (opt-in)
-- `/antispam activar limite ventana timeout_segundos`: borra el mensaje que dispara el limite y aplica timeout configurable. Desactivado por defecto.
+- `/antispam activar limite ventana timeout_segundos`: borra el mensaje que dispara el limite y aplica timeout configurable. Desactivado por defecto; el caso se registra con la ficha estructurada de moderacion.
 - `/antiraid activar umbral ventana`: alerta al canal de logs ante picos de entradas; no banea ni expulsa automaticamente.
-- `/antienlaces activar`: bloquea invitaciones de Discord y una lista limitada de dominios conocidos de phishing/rastreo; no bloquea enlaces normales por defecto.
+- `/antienlaces activar`: bloquea invitaciones de Discord y una lista limitada de dominios conocidos de phishing/rastreo; no bloquea enlaces normales por defecto. Las acciones de este filtro, anti-spam, palabras, menciones, mayusculas y repeticion generan fichas de caso con enlace al mensaje cuando existe. Si no hay un canal de logs operativo, no se aplica la accion automática.
 - `/antimenciones activar maximo`: elimina mensajes que superen el limite de menciones.
 - `/antirepeticion activar repeticiones ventana`: detecta mensajes repetidos.
 - `/filtro_caps activar porcentaje minimo_letras`: filtra mensajes largos con demasiadas mayusculas.
@@ -137,7 +137,7 @@ La primera inicialización intenta importar los JSON que todavía existan en la 
 
 - **La moderacion IA ya no funciona en modo de prueba cuando activas `/aimoderacion activar`.** Registra casos con usuario, canal, categoria, gravedad, confianza, motivo, mensaje, estado, enlace e ID de infraccion. Solo si la IA marca gravedad 3, confianza de al menos 95% y categoria `sexual`, `threat`, `hate` o `harassment`, intenta borrar el mensaje y aplicar timeout de 24 horas. Los demas casos solo quedan registrados para revision humana; nunca banea ni expulsa automaticamente.
 - Al activar `/aimoderacion`, los mensajes analizados se envian a Groq y la moderacion de alta severidad queda en vivo. Informa a los miembros, revisa las condiciones de privacidad aplicables y da a Papu los permisos `Gestionar mensajes` y `Moderar miembros`. Los casos aparecen en el canal configurado mediante `/setlogchannel`.
-- Configura `/setlogchannel` hacia un canal privado para el staff. Los logs pueden contener mensajes eliminados/editados y datos sensibles.
+- Configura `/setlogchannel` hacia un canal privado para el staff antes de activar `/aimoderacion activar`. Ese comando exige que Papu pueda escribir en los logs y que tenga `Gestionar mensajes` y `Moderar miembros`; si faltan, la moderacion en vivo no se activa. Los logs pueden contener mensajes eliminados/editados y datos sensibles.
 - El canal de respuesta automatica es opt-in por servidor y se configura con `/canal_chat`. Los mensajes de ese canal tambien pueden enviarse a Groq para generar respuestas.
 - Nunca pongas tokens o claves API en el repositorio. Si se filtran, revocalos y genera otros.
 - Con `DATABASE_URL`, el historial breve de chat tambien se guarda en PostgreSQL; informa a los miembros de ese almacenamiento y restringe el acceso a la base de datos.
