@@ -48,6 +48,30 @@ def contains_suspicious_link(content: str) -> bool:
             return True
     return False
 
+
+def contains_blocked_word(content: str, words) -> bool:
+    """Coincidencia por palabra/frase completa para evitar bloquear subcadenas accidentales."""
+    text = (content or "").casefold()
+    for word in words or []:
+        term = str(word).strip().casefold()
+        if term and re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text):
+            return True
+    return False
+
+
+def is_caps_spam(content: str, percent: int = 80, minimum: int = 12) -> bool:
+    """Detecta texto con exceso de mayusculas solo si tiene suficientes letras."""
+    letters = [char for char in (content or "") if char.isalpha()]
+    if len(letters) < minimum:
+        return False
+    uppercase = sum(char.isupper() for char in letters)
+    return uppercase / len(letters) * 100 >= percent
+
+
+def mention_count(message: discord.Message) -> int:
+    """Cuenta usuarios, roles y @everyone/@here como menciones."""
+    return len(message.mentions) + len(message.role_mentions) + (1 if message.mention_everyone else 0)
+
 def contains_discord_invite(content: str) -> bool:
     """Solo detecta invitaciones de Discord; los enlaces normales no se bloquean."""
     return bool(INVITE_RE.search(content or ""))
@@ -72,6 +96,8 @@ class Seguridad(commands.Cog):
         self.join_times = defaultdict(deque)
         self.last_spam_action = {}
         self.last_raid_alert = {}
+        self.recent_texts = defaultdict(deque)
+        self.last_report_at = {}
 
     def guild_config(self, guild_id: int) -> dict:
         return self.settings.setdefault(str(guild_id), {})
@@ -219,6 +245,159 @@ class Seguridad(commands.Cog):
         embed.set_footer(text="Configura un canal de logs con /setlogchannel para recibir alertas.")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+
+    @app_commands.command(name="antimenciones", description="Limita menciones en mensajes para frenar ataques")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def antimenciones(self, interaction: discord.Interaction, activar: bool, maximo: app_commands.Range[int, 2, 10] = 4):
+        if activar and not interaction.guild.me.guild_permissions.manage_messages:
+            return await interaction.response.send_message("necesito gestionar mensajes para borrar menciones excesivas.", ephemeral=True)
+        self.guild_config(interaction.guild_id)["anti_mentions"] = {"enabled": activar, "limit": maximo}
+        self.save_settings()
+        status = f"activado: maximo {maximo} menciones por mensaje." if activar else "desactivado."
+        await interaction.response.send_message(f"anti-menciones {status}", ephemeral=True)
+        await self.security_log(interaction.guild, f"🛡️ Anti-menciones cambiado por {interaction.user}: {status}")
+
+    @app_commands.command(name="antirepeticion", description="Detecta mensajes repetidos de forma automatica")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def antirepeticion(self, interaction: discord.Interaction, activar: bool, repeticiones: app_commands.Range[int, 2, 6] = 3, ventana: app_commands.Range[int, 3, 60] = 12):
+        if activar and not interaction.guild.me.guild_permissions.manage_messages:
+            return await interaction.response.send_message("necesito gestionar mensajes para retirar repeticiones.", ephemeral=True)
+        self.guild_config(interaction.guild_id)["anti_repeat"] = {"enabled": activar, "repeats": repeticiones, "window": ventana}
+        self.save_settings()
+        status = f"activado: {repeticiones} mensajes iguales en {ventana} s." if activar else "desactivado."
+        await interaction.response.send_message(f"anti-repeticion {status}", ephemeral=True)
+        await self.security_log(interaction.guild, f"🔁 Anti-repeticion cambiado por {interaction.user}: {status}")
+
+    @app_commands.command(name="filtro_caps", description="Retira mensajes excesivamente escritos en mayusculas")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def filtro_caps(self, interaction: discord.Interaction, activar: bool, porcentaje: app_commands.Range[int, 60, 100] = 85, minimo_letras: app_commands.Range[int, 8, 40] = 12):
+        if activar and not interaction.guild.me.guild_permissions.manage_messages:
+            return await interaction.response.send_message("necesito gestionar mensajes para aplicar el filtro de mayusculas.", ephemeral=True)
+        self.guild_config(interaction.guild_id)["caps_filter"] = {"enabled": activar, "percent": porcentaje, "minimum": minimo_letras}
+        self.save_settings()
+        status = f"activado: {porcentaje}% de mayusculas, minimo {minimo_letras} letras." if activar else "desactivado."
+        await interaction.response.send_message(f"filtro caps {status}", ephemeral=True)
+        await self.security_log(interaction.guild, f"🔠 Filtro caps cambiado por {interaction.user}: {status}")
+
+    @app_commands.command(name="palabra_bloquear", description="Añade una palabra o frase al filtro del servidor")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def palabra_bloquear(self, interaction: discord.Interaction, palabra: app_commands.Range[str, 2, 40]):
+        cfg = self.guild_config(interaction.guild_id)
+        words = cfg.setdefault("blocked_words", [])
+        word = palabra.strip().casefold()
+        if len(words) >= 50 and word not in words:
+            return await interaction.response.send_message("el filtro admite hasta 50 palabras o frases.", ephemeral=True)
+        if word in words:
+            return await interaction.response.send_message("esa palabra ya esta en el filtro.", ephemeral=True)
+        words.append(word)
+        self.save_settings()
+        await interaction.response.send_message(f"añadida al filtro: {discord.utils.escape_markdown(word)}", ephemeral=True)
+        await self.security_log(interaction.guild, f"🧰 {interaction.user} añadió una palabra/frase al filtro personalizado.")
+
+    @app_commands.command(name="palabra_permitir", description="Retira una palabra o frase del filtro del servidor")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def palabra_permitir(self, interaction: discord.Interaction, palabra: app_commands.Range[str, 2, 40]):
+        cfg = self.guild_config(interaction.guild_id)
+        words = cfg.setdefault("blocked_words", [])
+        word = palabra.strip().casefold()
+        if word not in words:
+            return await interaction.response.send_message("esa palabra no estaba en el filtro.", ephemeral=True)
+        words.remove(word)
+        self.save_settings()
+        await interaction.response.send_message(f"retirada del filtro: {discord.utils.escape_markdown(word)}", ephemeral=True)
+        await self.security_log(interaction.guild, f"🧰 {interaction.user} retiró una palabra/frase del filtro personalizado.")
+
+    @app_commands.command(name="palabras_bloqueadas", description="Lista las palabras configuradas en el filtro")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def palabras_bloqueadas(self, interaction: discord.Interaction):
+        words = self.guild_config(interaction.guild_id).get("blocked_words", [])
+        if not words:
+            return await interaction.response.send_message("el filtro personalizado esta vacio.", ephemeral=True)
+        description = "\n".join(f"• {discord.utils.escape_markdown(word)}" for word in words)
+        await interaction.response.send_message(f"palabras/frases filtradas:\n{description[:1700]}", ephemeral=True)
+
+    @app_commands.command(name="canal_reportes", description="Configura donde enviar reportes privados al staff")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def canal_reportes(self, interaction: discord.Interaction, canal: discord.TextChannel = None):
+        cfg = self.guild_config(interaction.guild_id)
+        if canal is None:
+            cfg.pop("report_channel", None)
+            self.save_settings()
+            return await interaction.response.send_message("canal de reportes desactivado.", ephemeral=True)
+        perms = canal.permissions_for(interaction.guild.me)
+        if not (perms.view_channel and perms.send_messages and perms.embed_links):
+            return await interaction.response.send_message("necesito ver el canal, enviar mensajes e insertar embeds.", ephemeral=True)
+        cfg["report_channel"] = canal.id
+        self.save_settings()
+        await interaction.response.send_message(f"los reportes se enviaran a {canal.mention}. procura que solo el staff pueda verlo.", ephemeral=True)
+
+    @app_commands.command(name="reportar", description="Envía un reporte privado al canal de moderacion")
+    @app_commands.guild_only()
+    async def reportar(self, interaction: discord.Interaction, usuario: discord.Member, motivo: app_commands.Range[str, 10, 500]):
+        key = (interaction.guild_id, interaction.user.id)
+        now = time.monotonic()
+        if now - self.last_report_at.get(key, 0) < 30:
+            return await interaction.response.send_message("espera un poco antes de enviar otro reporte.", ephemeral=True)
+        channel_id = self.guild_config(interaction.guild_id).get("report_channel")
+        channel = interaction.guild.get_channel(int(channel_id)) if channel_id else None
+        if channel is None:
+            return await interaction.response.send_message("el staff aun no configuró el canal con /canal_reportes.", ephemeral=True)
+        self.last_report_at[key] = now
+        embed = discord.Embed(title="📨 Nuevo reporte", color=discord.Color.orange(), timestamp=discord.utils.utcnow())
+        embed.add_field(name="Reportado", value=f"{discord.utils.escape_mentions(usuario.display_name)} ({usuario.id})", inline=False)
+        embed.add_field(name="Reportado por", value=f"{discord.utils.escape_mentions(interaction.user.display_name)} ({interaction.user.id})", inline=False)
+        embed.add_field(name="Motivo aportado", value=discord.utils.escape_mentions(motivo.strip())[:900], inline=False)
+        embed.set_footer(text="Reporte no verificado: revisa el contexto antes de actuar.")
+        try:
+            await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+        except (discord.Forbidden, discord.HTTPException):
+            self.last_report_at.pop(key, None)
+            return await interaction.response.send_message("no pude enviar el reporte; avisa al staff por otro medio.", ephemeral=True)
+        await interaction.response.send_message("reporte enviado de forma privada al canal de moderacion. el staff revisara el contexto.", ephemeral=True)
+
+    @app_commands.command(name="auditoria_permisos", description="Revisa permisos delicados de everyone y del bot")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def auditoria_permisos(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        everyone = guild.default_role.permissions
+        dangerous = [
+            ("Administrador", everyone.administrator),
+            ("Gestionar servidor", everyone.manage_guild),
+            ("Gestionar canales", everyone.manage_channels),
+            ("Gestionar roles", everyone.manage_roles),
+            ("Expulsar miembros", everyone.kick_members),
+            ("Banear miembros", everyone.ban_members),
+            ("Gestionar webhooks", everyone.manage_webhooks),
+            ("Mencionar everyone", everyone.mention_everyone),
+        ]
+        enabled = [label for label, active in dangerous if active]
+        bot_member = guild.me
+        missing = []
+        if bot_member:
+            perms = bot_member.guild_permissions
+            for attr, label in (
+                ("view_channel", "Ver canales"),
+                ("send_messages", "Enviar mensajes"),
+                ("manage_messages", "Gestionar mensajes"),
+                ("moderate_members", "Aplicar timeout"),
+                ("manage_channels", "Gestionar canales"),
+            ):
+                if not getattr(perms, attr):
+                    missing.append(label)
+        embed = discord.Embed(title="🔎 Auditoria de permisos", color=discord.Color.orange() if enabled else discord.Color.green())
+        embed.add_field(name="Permisos delicados de everyone", value="\n".join(f"⚠️ {item}" for item in enabled) if enabled else "No encontre permisos delicados activados para everyone.", inline=False)
+        embed.add_field(name="Permisos que le faltan a Papu", value="\n".join(f"• {item}" for item in missing) if missing else "No encontre carencias generales en la lista revisada.", inline=False)
+        embed.set_footer(text="Auditoria orientativa; no cambia permisos automaticamente.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.guild is None or message.author.bot or message.webhook_id:
@@ -244,6 +423,60 @@ class Seguridad(commands.Cog):
                 f"🔗 Eliminado enlace no permitido de {member} ({member.id}) en #{message.channel.name}.",
             )
             return
+
+        blocked_words = cfg.get("blocked_words", [])
+        if blocked_words and contains_blocked_word(message.content, blocked_words):
+            try:
+                await message.delete()
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+            await self.security_log(message.guild, f"🧰 Mensaje filtrado por regla personalizada de {member} en #{message.channel.name}.")
+            return
+
+        mention_cfg = cfg.get("anti_mentions", {})
+        mentions_limit = max(2, min(int(mention_cfg.get("limit", 4)), 10))
+        if mention_cfg.get("enabled") and mention_count(message) > mentions_limit:
+            try:
+                await message.delete()
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+            await self.security_log(message.guild, f"📣 Exceso de menciones de {member} en #{message.channel.name}; limite {mentions_limit}.")
+            return
+
+        caps_cfg = cfg.get("caps_filter", {})
+        if caps_cfg.get("enabled") and is_caps_spam(
+            message.content,
+            percent=max(60, min(int(caps_cfg.get("percent", 85)), 100)),
+            minimum=max(8, min(int(caps_cfg.get("minimum", 12)), 40)),
+        ):
+            try:
+                await message.delete()
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+            await self.security_log(message.guild, f"🔠 Mensaje con exceso de mayusculas retirado de {member} en #{message.channel.name}.")
+            return
+
+        repeat_cfg = cfg.get("anti_repeat", {})
+        if repeat_cfg.get("enabled") and message.content.strip():
+            window_repeat = max(3, min(int(repeat_cfg.get("window", 12)), 60))
+            repeat_limit = max(2, min(int(repeat_cfg.get("repeats", 3)), 6))
+            repeat_key = (message.guild.id, member.id)
+            recent = self.recent_texts[repeat_key]
+            now_repeat = time.monotonic()
+            cutoff_repeat = now_repeat - window_repeat
+            while recent and recent[0][0] < cutoff_repeat:
+                recent.popleft()
+            normalized = " ".join(message.content.casefold().split())[:500]
+            recent.append((now_repeat, normalized))
+            repeated = sum(1 for _, text in recent if text == normalized)
+            if repeated >= repeat_limit:
+                recent.clear()
+                try:
+                    await message.delete()
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
+                await self.security_log(message.guild, f"🔁 Mensaje repetido retirado de {member} en #{message.channel.name}; {repeat_limit} repeticiones en {window_repeat} s.")
+                return
 
         spam_cfg = cfg.get("anti_spam", {})
         if not spam_cfg.get("enabled"):
