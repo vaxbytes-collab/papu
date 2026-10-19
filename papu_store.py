@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from threading import RLock
 
-DATA_DIR = Path(os.getenv("PAPU_DATA_DIR", "data"))
+DATA_DIR = Path(os.getenv("PAPU_DATA_DIR", "."))
 _LOCK = RLock()
 
 
