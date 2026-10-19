@@ -12,7 +12,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from papu_store import load_json, save_json
-from moderation_cases import make_case_embed, next_case_id
+from moderation_cases import make_case_content, next_case_id
 
 INVITE_RE = re.compile(
     r"(?i)(?:https?://)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com/invite)/[a-z0-9-]+"
@@ -412,7 +412,7 @@ class Seguridad(commands.Cog):
                 referenced_channel = interaction.guild.get_channel(linked_channel_id)
 
         case_id = next_case_id(interaction.guild_id)
-        embed = make_case_embed(
+        case_content = make_case_content(
             case_id=case_id,
             title="📨 reporte recibido",
             username=str(usuario),
@@ -427,10 +427,9 @@ class Seguridad(commands.Cog):
             message_url=enlace_mensaje.strip() if enlace_mensaje else None,
             reporter=f"{interaction.user} ({interaction.user.id})",
             status="REPORTE RECIBIDO: pendiente de revision humana; no se aplico ninguna sancion desde el reporte.",
-            color=discord.Color.orange(),
         )
         try:
-            await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            await channel.send(content=case_content, allowed_mentions=discord.AllowedMentions.none())
         except (discord.Forbidden, discord.HTTPException):
             return await interaction.response.send_message("no pude enviar el reporte; avisa al staff por otro medio.", ephemeral=True)
         self.last_report_at[key] = now
