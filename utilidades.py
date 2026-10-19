@@ -18,6 +18,7 @@ class Utilidades(commands.Cog):
         self.reminders = load_json("reminders.json", [])
         self.events = load_json("events.json", {})
         self.suggestions = load_json("suggestions.json", {})
+        self.afk = load_json("afk.json", {})
         self.reminder_loop.start()
 
     def cog_unload(self):
@@ -193,6 +194,97 @@ class Utilidades(commands.Cog):
         cfg = self.guild_settings(interaction.guild_id)
         channel = interaction.guild.get_channel(int(cfg["suggestion_channel"])) if cfg.get("suggestion_channel") else None
         await interaction.response.send_message(f"Canal de sugerencias: {channel.mention if channel else 'sin configurar'}", ephemeral=True)
+
+
+    def afk_key(self, guild_id, user_id):
+        return f"{guild_id or 'dm'}:{user_id}"
+
+    @app_commands.command(name="afk", description="Marca que estas ausente y avisa cuando te mencionen")
+    async def afk(self, interaction: discord.Interaction,
+                  motivo: app_commands.Range[str, 1, 150] = "sin motivo"):
+        key = self.afk_key(interaction.guild_id, interaction.user.id)
+        clean_reason = discord.utils.escape_mentions(motivo.strip()) or "sin motivo"
+        self.afk[key] = {"reason": clean_reason, "since": int(time.time())}
+        save_json("afk.json", self.afk)
+        await interaction.response.send_message(
+            f"💤 listo, estas AFK: {clean_reason}. te avisare cuando regreses o alguien te mencione.",
+            ephemeral=True,
+        )
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if message.author.bot or message.webhook_id:
+            return
+        key = self.afk_key(message.guild.id if message.guild else None, message.author.id)
+        if key in self.afk:
+            self.afk.pop(key, None)
+            save_json("afk.json", self.afk)
+            try:
+                await message.channel.send(
+                    f"👋 bienvenido de vuelta, {message.author.mention}. quite tu estado AFK.",
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+            except discord.HTTPException:
+                pass
+
+        if message.guild is None:
+            return
+        notices = []
+        seen = set()
+        for user in message.mentions:
+            if user.id in seen or user.bot:
+                continue
+            seen.add(user.id)
+            data = self.afk.get(self.afk_key(message.guild.id, user.id))
+            if not isinstance(data, dict):
+                continue
+            try:
+                since = int(data.get("since", time.time()))
+            except (TypeError, ValueError):
+                since = int(time.time())
+            reason = discord.utils.escape_mentions(str(data.get("reason", "sin motivo")))[:150]
+            notices.append(
+                f"💤 **{discord.utils.escape_mentions(user.display_name)}** esta AFK "
+                f"desde <t:{since}:R>: {reason}"
+            )
+            if len(notices) >= 5:
+                break
+        if notices:
+            try:
+                await message.channel.send(
+                    "\\n".join(notices),
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+            except discord.HTTPException:
+                pass
+
+    @app_commands.command(name="rolinfo", description="Muestra informacion de un rol del servidor")
+    @app_commands.guild_only()
+    async def rolinfo(self, interaction: discord.Interaction, rol: discord.Role):
+        embed = discord.Embed(title=f"🎭 Rol: {rol.name}", color=rol.color or discord.Color.blurple())
+        embed.add_field(name="ID", value=str(rol.id), inline=True)
+        embed.add_field(name="Miembros", value=str(len(rol.members)), inline=True)
+        embed.add_field(name="Posicion", value=str(rol.position), inline=True)
+        embed.add_field(name="Mencionable", value="si" if rol.mentionable else "no", inline=True)
+        embed.add_field(name="Creado", value=f"<t:{int(rol.created_at.timestamp())}:D>", inline=True)
+        embed.add_field(name="Permisos", value="administrador" if rol.permissions.administrator else
+                        "gestionar servidor" if rol.permissions.manage_guild else
+                        "permisos habituales", inline=True)
+        embed.set_footer(text=f"Solicitado por {interaction.user.display_name}")
+        await interaction.response.send_message(embed=embed, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
+
+    @app_commands.command(name="timestamp", description="Convierte una fecha Unix a formatos de Discord")
+    async def timestamp(self, interaction: discord.Interaction,
+                        unix: app_commands.Range[int, 0, 4102444800]):
+        embed = discord.Embed(title="🕒 Timestamp de Discord", color=discord.Color.blurple())
+        embed.description = (
+            f"**Vista completa:** <t:{unix}:F>\n"
+            f"**Fecha corta:** <t:{unix}:d>\n"
+            f"**Hora:** <t:{unix}:t>\n"
+            f"**Relativo:** <t:{unix}:R>\n\n"
+            f"**Codigo para copiar:** `<t:{unix}:F>`"
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 async def setup(bot):
