@@ -40,7 +40,7 @@ class PapuBot(commands.Bot):
 
     async def setup_hook(self):
         # Los cogs estan en la raiz del repositorio, no dentro de una carpeta cogs/.
-        for module in ("moderacion", "entretenimiento"):
+        for module in ("moderacion", "entretenimiento", "utilidades", "juegos", "musica"):
             try:
                 await self.load_extension(module)
                 print(f"[OK] Modulo cargado: {module}")
