@@ -206,8 +206,8 @@ async def on_message(message):
                             allowed_mentions=discord.AllowedMentions.none(),
                         )
                     except discord.HTTPException:
-                        print(
-                            "[ERROR] Groq terminó, pero Discord rechazó el mensaje. Comprueba View Channel y Send Messages en el canal.",
+                        logging.exception(
+                            "[ERROR] Discord rechazó el mensaje. Comprueba View Channel y Send Messages en el canal."
                         )
     finally:
         await bot.process_commands(message)
