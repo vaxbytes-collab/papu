@@ -89,7 +89,7 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 
 ### Administracion y moderacion
 - `/setlogchannel`, `/logconfig`: registros del servidor.
-- `/aimoderacion activar`, `/modcheck texto`: alertas de IA y revision manual.
+- `/aimoderacion activar`: activa alertas y acciones en vivo de alta severidad; `/aimoderacion desactivar` las apaga. `/modcheck texto` analiza manualmente sin sancionar.
 - `/canal_chat [canal]`: canal optativo donde Papu responde sin mencion; omitir el canal desactiva esa funcion.
 - `/warn`, `/warns`, `/unwarn`, `/clearwarns`, `/diagnostico`, `/kick`, `/ban`, `/unban`, `/timeout`, `/untimeout`, `/timeout_estado`, `/purge`, `/purge_usuario`, `/purge_bots`, `/slowmode`, `/lock`, `/unlock`, `/apodo`, `/rol_dar`, `/rol_quitar`.
 - `/userinfo`, `/serverinfo`, `/ping`.
@@ -135,8 +135,8 @@ La primera inicialización intenta importar los JSON que todavía existan en la 
 
 ## Seguridad, permisos y privacidad
 
-- **La IA nunca sanciona automaticamente.** Clasifica texto y puede generar falsos positivos o negativos; el staff debe revisar el contexto antes de actuar.
-- Al activar `/aimoderacion`, los mensajes analizados se envian a Groq. Informa claramente a los miembros antes de activarlo y revisa las condiciones y politicas aplicables.
+- **La moderacion IA ya no funciona en modo de prueba cuando activas `/aimoderacion activar`.** Registra casos con usuario, canal, categoria, gravedad, confianza, motivo, mensaje, estado, enlace e ID de infraccion. Solo si la IA marca gravedad 3, confianza de al menos 95% y categoria `sexual`, `threat`, `hate` o `harassment`, intenta borrar el mensaje y aplicar timeout de 24 horas. Los demas casos solo quedan registrados para revision humana; nunca banea ni expulsa automaticamente.
+- Al activar `/aimoderacion`, los mensajes analizados se envian a Groq y la moderacion de alta severidad queda en vivo. Informa a los miembros, revisa las condiciones de privacidad aplicables y da a Papu los permisos `Gestionar mensajes` y `Moderar miembros`. Los casos aparecen en el canal configurado mediante `/setlogchannel`.
 - Configura `/setlogchannel` hacia un canal privado para el staff. Los logs pueden contener mensajes eliminados/editados y datos sensibles.
 - El canal de respuesta automatica es opt-in por servidor y se configura con `/canal_chat`. Los mensajes de ese canal tambien pueden enviarse a Groq para generar respuestas.
 - Nunca pongas tokens o claves API en el repositorio. Si se filtran, revocalos y genera otros.
