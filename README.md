@@ -28,7 +28,7 @@ Configura las variables de entorno (por ejemplo, en un archivo `.env` local que 
 - `GROQ_API_KEY`: opcional; habilita chat y analisis de moderacion IA.
 - `GROQ_CHAT_MODEL`: modelo conversacional opcional.
 - `GROQ_MODERATION_MODEL`: modelo clasificador opcional.
-- `PAPU_DATA_DIR`: carpeta persistente para JSON (por defecto `data/`).
+- `PAPU_DATA_DIR`: directorio donde se guardan los JSON. En local, por defecto es `data/`; en Render, por defecto es `/var/data`.
 - `PORT`: puerto del endpoint de estado (por defecto 8080).
 
 En Discord Developer Portal activa **Message Content Intent** y **Server Members Intent** cuando uses sus eventos. Invita el bot con permisos minimos necesarios para los modulos activados: ver canales, enviar mensajes, embeds, leer historial, añadir reacciones y los permisos de moderacion/voz que decidas utilizar.
@@ -100,7 +100,11 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 
 ## Persistencia
 
-Los JSON se guardan en `PAPU_DATA_DIR` (por defecto, la raiz del proyecto para conservar compatibilidad con la configuracion de moderacion existente). Para hosting efimero, monta un disco persistente o los recordatorios, configuracion, sugerencias, eventos y mascotas se perderan al reiniciar. Los ficheros JSON son adecuados para una instancia pequeña; para multiples procesos o alto volumen, migra a SQLite/PostgreSQL y añade transacciones.
+Todos los datos persistentes de Papu (michis, recordatorios, eventos, sugerencias, avisos y configuracion de los servidores) se guardan en el mismo directorio definido por `PAPU_DATA_DIR`. En local usa `data/`; en Render usa `/var/data`.
+
+**Importante para Render:** el sistema de archivos normal del servicio es efimero: sus cambios se pierden al volver a desplegar o reiniciar. Para conservar los datos, adjunta un **Persistent Disk** desde el panel de Render con punto de montaje exacto `/var/data` y usa ese mismo valor en `PAPU_DATA_DIR` si la variable esta definida manualmente. El disco persistente requiere un plan de Render compatible; en un servicio sin disco, el codigo solo puede avisar, no evitar que Render borre el sistema de archivos efimero.
+
+Al arrancar, Papu intenta migrar los JSON antiguos desde la raiz del proyecto o desde `data/` al directorio nuevo, pero solo si los archivos antiguos siguen disponibles y no hay ya un archivo en destino. Esto no puede recuperar datos que Render ya haya borrado en despliegues anteriores. Los JSON son adecuados para una instancia pequeña; para multiples procesos o alto volumen, considera PostgreSQL.
 
 ## Seguridad, permisos y privacidad
 
