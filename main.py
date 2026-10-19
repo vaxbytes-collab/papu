@@ -9,6 +9,7 @@ from flask import Flask
 from groq import Groq
 from groq_config import get_groq_model
 from chat_policy import PROMPT_SISTEMA, deterministic_chat_reply, normalize_papu_style
+from web_search import build_search_query, format_search_context, format_search_reply, search_web, should_search_web
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -84,7 +85,7 @@ async def on_message(message):
 
             if not contenido and not message.attachments:
                 await message.channel.send("ke paso papu? tirame una duda o una fotito :v")
-            elif bot.groq_client is None:
+            elif bot.groq_client is None and not should_search_web(contenido):
                 await message.channel.send(normalize_papu_style("falta configurar GROQ_API_KEY para que funcione la ia, papu."))
             else:
                 user_key = f"{message.guild.id if message.guild else 'dm'}:{message.author.id}"
@@ -125,31 +126,73 @@ async def on_message(message):
                         HISTORIALES_USUARIOS[user_key] = [history[0]] + history[-MAX_HISTORIAL:]
                         keep_turn = True
                     else:
+                        search_requested = should_search_web(contenido)
+                        search_query = ""
+                        search_results = []
                         try:
                             async with message.channel.typing():
-                                response = await asyncio.wait_for(
-                                    asyncio.to_thread(
-                                        bot.groq_client.chat.completions.create,
-                                        model=get_groq_model("GROQ_CHAT_MODEL"),
-                                        messages=[dict(item) for item in history],
-                                        temperature=0.7,
-                                        max_tokens=700,
-                                    ),
-                                    timeout=30.0,
-                                )
-                            answer = normalize_papu_style((response.choices[0].message.content or "").strip())
-                            if not answer:
-                                answer = normalize_papu_style("miau, la IA devolvió una respuesta vacía :v")
-                            answer = answer[:1900]
+                                if search_requested:
+                                    # "busca" sin tema hereda el contexto del chat anterior.
+                                    search_query = build_search_query(contenido, history[:-1])
+                                    if search_query:
+                                        try:
+                                            search_results = await asyncio.wait_for(
+                                                asyncio.to_thread(search_web, search_query),
+                                                timeout=15.0,
+                                            )
+                                        except asyncio.TimeoutError:
+                                            print("[WARN] La busqueda web agoto el tiempo de espera.")
+                                            search_results = []
+                                        except Exception:
+                                            print("[WARN] Fallo la busqueda web", exc_info=True)
+                                            search_results = []
+
+                                    if not search_query:
+                                        answer = normalize_papu_style(
+                                            "arre, compa, si te busco el dato, pero no me quedo claro el tema. "
+                                            "dime que quieres encontrar y me pongo a buscarlo :v"
+                                        )
+                                    elif not search_results:
+                                        answer = normalize_papu_style(
+                                            f"ay, compa, intente buscar «{search_query[:100]}» pero el buscador no me devolvio "
+                                            "resultados esta vez. no te voy a inventar datos; probamos otra consulta? :v"
+                                        )
+                                    elif bot.groq_client is None:
+                                        answer = normalize_papu_style(format_search_reply(search_query, search_results))
+                                if not search_requested or (search_query and search_results and bot.groq_client is not None):
+                                    model_messages = [dict(item) for item in history]
+                                    if search_requested and search_results:
+                                        model_messages.insert(
+                                            1,
+                                            {
+                                                "role": "system",
+                                                "content": format_search_context(search_query, search_results),
+                                            },
+                                        )
+                                    response = await asyncio.wait_for(
+                                        asyncio.to_thread(
+                                            bot.groq_client.chat.completions.create,
+                                            model=get_groq_model("GROQ_CHAT_MODEL"),
+                                            messages=model_messages,
+                                            temperature=0.7,
+                                            max_tokens=700,
+                                        ),
+                                        timeout=30.0,
+                                    )
+                                    answer = normalize_papu_style((response.choices[0].message.content or "").strip())
+                                    if not answer:
+                                        answer = normalize_papu_style("miau, la ia devolvio una respuesta vacia :v")
+                                    answer = answer[:1900]
+
                             history.append({"role": "assistant", "content": answer})
                             HISTORIALES_USUARIOS[user_key] = [history[0]] + history[-MAX_HISTORIAL:]
                             keep_turn = True
                         except asyncio.TimeoutError:
-                            answer = normalize_papu_style("Papu se quedó esperando a la IA y agotó el tiempo de espera 😿. Prueba otra vez en unos segundos.")
-                            print("[WARN] Groq agotó el tiempo de espera al responder un mensaje.")
+                            answer = normalize_papu_style("la ia se quedo pensando demasiado, compa 😿. intentalo otra vez en unos segundos :v")
+                            print("[WARN] Groq agoto el tiempo de espera al responder un mensaje.")
                         except Exception:
-                            answer = normalize_papu_style("se me trabaron las patitas con la IA :'v intenta de nuevo en un rato.")
-                            print("[ERROR] Falló la llamada a Groq", exc_info=True)
+                            answer = normalize_papu_style("se me trabaron las patitas con la ia :'v intenta de nuevo en un rato.")
+                            print("[ERROR] Fallo la llamada a Groq", exc_info=True)
                         finally:
                             # No dejes preguntas fallidas acumuladas en el historial.
                             if not keep_turn and history and history[-1].get("role") == "user":
