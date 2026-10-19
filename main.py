@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from flask import Flask
 from groq import Groq
 from groq_config import get_groq_model
-from chat_policy import PROMPT_SISTEMA, deterministic_chat_reply
+from chat_policy import PROMPT_SISTEMA, deterministic_chat_reply, normalize_papu_style
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -128,18 +128,18 @@ async def on_message(message):
                                     ),
                                     timeout=30.0,
                                 )
-                            answer = (response.choices[0].message.content or "").strip()
+                            answer = normalize_papu_style((response.choices[0].message.content or "").strip())
                             if not answer:
-                                answer = "miau, la IA devolvió una respuesta vacía :v"
+                                answer = normalize_papu_style("miau, la IA devolvió una respuesta vacía :v")
                             answer = answer[:1900]
                             history.append({"role": "assistant", "content": answer})
                             HISTORIALES_USUARIOS[user_key] = [history[0]] + history[-MAX_HISTORIAL:]
                             keep_turn = True
                         except asyncio.TimeoutError:
-                            answer = "Papu se quedó esperando a la IA y agotó el tiempo de espera 😿. Prueba otra vez en unos segundos."
+                            answer = normalize_papu_style("Papu se quedó esperando a la IA y agotó el tiempo de espera 😿. Prueba otra vez en unos segundos.")
                             print("[WARN] Groq agotó el tiempo de espera al responder un mensaje.")
                         except Exception:
-                            answer = "se me trabaron las patitas con la IA :'v intenta de nuevo en un rato."
+                            answer = normalize_papu_style("se me trabaron las patitas con la IA :'v intenta de nuevo en un rato.")
                             print("[ERROR] Falló la llamada a Groq", exc_info=True)
                         finally:
                             # No dejes preguntas fallidas acumuladas en el historial.
@@ -147,6 +147,7 @@ async def on_message(message):
                                 history.pop()
 
                     try:
+                        answer = normalize_papu_style(answer)
                         await message.channel.send(
                             answer,
                             allowed_mentions=discord.AllowedMentions.none(),
