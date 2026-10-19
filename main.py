@@ -85,7 +85,7 @@ async def on_message(message):
             if not contenido and not message.attachments:
                 await message.channel.send("ke paso papu? tirame una duda o una fotito :v")
             elif bot.groq_client is None:
-                await message.channel.send("falta configurar GROQ_API_KEY para que funcione la ia, papu.")
+                await message.channel.send(normalize_papu_style("falta configurar GROQ_API_KEY para que funcione la ia, papu."))
             else:
                 user_key = f"{message.guild.id if message.guild else 'dm'}:{message.author.id}"
                 lock = BLOQUEOS_USUARIOS.setdefault(user_key, asyncio.Lock())
