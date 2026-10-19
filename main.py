@@ -11,7 +11,8 @@ from groq import Groq
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# Evita esperas largas y reintentos ocultos cuando el proveedor no responde.\ngroq_client = Groq(api_key=GROQ_API_KEY, timeout=25.0, max_retries=0) if GROQ_API_KEY else None
+# Evita esperas largas y reintentos ocultos cuando el proveedor no responde.
+groq_client = Groq(api_key=GROQ_API_KEY, timeout=25.0, max_retries=0) if GROQ_API_KEY else None
 
 app = Flask(__name__)
 
