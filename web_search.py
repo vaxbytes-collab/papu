@@ -19,10 +19,10 @@ _FACTUAL_LOOKUP = re.compile(
     re.IGNORECASE,
 )
 _CONTEXT_LOOKUP = re.compile(
-    r"\\b(track\\s*list|tracklist|lista de canciones|lista de temas|discografia|"
+    r"\b(track\s*list|tracklist|lista de canciones|lista de temas|discografia|"
     r"discografía|qu[eé] paso|qu[eé] ocurrio|cuando|d[oó]nde|qui[eé]n|"
-    r"fecha|precio|noticias|fuente oficial|album|\\bye\\b|kanye west|"
-    r"mercado|reabrio|reabrir|se estreno|lanzamiento|cu[aá]l es)\\b",
+    r"fecha|precio|noticias|fuente oficial|album|\bye\b|kanye west|"
+    r"mercado|reabrio|reabrir|se estreno|lanzamiento|cu[aá]l es)\b",
     re.IGNORECASE,
 )
 _GENERIC_HISTORY = {
