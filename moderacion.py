@@ -148,6 +148,11 @@ class Moderacion(commands.Cog):
             return
 
         settings = self.settings.get(self.guild_key(message.guild), {})
+        raw_log_channel = self.log_channels.get(self.guild_key(message.guild))
+        log_channel = message.guild.get_channel(int(raw_log_channel)) if raw_log_channel else None
+        bot_member = message.guild.me
+        log_permissions = log_channel.permissions_for(bot_member) if log_channel and bot_member else None
+        logs_ready = bool(log_permissions and log_permissions.view_channel and log_permissions.send_messages)
         severity = verdict["severity"]
         confidence = verdict["confidence"]
         category = verdict["category"]
@@ -158,6 +163,7 @@ class Moderacion(commands.Cog):
         live_action = (
             settings.get("ai_enabled", False)
             and settings.get("ai_live_actions", False)
+            and logs_ready
             and severity == 3
             and confidence >= 0.95
             and category in severe_categories
@@ -186,6 +192,8 @@ class Moderacion(commands.Cog):
                     actions.append("timeout aplicado durante 24 horas")
                 except (discord.Forbidden, discord.HTTPException):
                     actions.append("no se pudo aplicar timeout (revisar Permisos y jerarquia de roles)")
+        elif settings.get("ai_live_actions", False) and not logs_ready:
+            actions.append("sin sancion automatica: el canal de logs no esta disponible")
         elif settings.get("ai_live_actions", False):
             actions.append("sin sancion automatica: gravedad/confianza/categoria no alcanzan el umbral de accion")
         else:
@@ -289,8 +297,35 @@ class Moderacion(commands.Cog):
     async def aimoderacion(self, interaction: discord.Interaction, activar: bool):
         key = self.guild_key(interaction.guild)
         config = self.settings.setdefault(key, {})
+        if activar:
+            raw_channel_id = self.log_channels.get(key)
+            log_channel = interaction.guild.get_channel(int(raw_channel_id)) if raw_channel_id else None
+            bot_member = interaction.guild.me
+            if log_channel is None:
+                return await interaction.response.send_message(
+                    "no active la moderacion en vivo todavía: primero configura un canal privado con /setlogchannel.",
+                    ephemeral=True,
+                )
+            channel_perms = log_channel.permissions_for(bot_member) if bot_member else None
+            if not channel_perms or not (channel_perms.view_channel and channel_perms.send_messages):
+                return await interaction.response.send_message(
+                    "no active la moderacion en vivo: Papu necesita ver y escribir en el canal de logs.",
+                    ephemeral=True,
+                )
+            bot_perms = bot_member.guild_permissions if bot_member else None
+            missing = []
+            if not bot_perms or not bot_perms.manage_messages:
+                missing.append("Gestionar mensajes")
+            if not bot_perms or not bot_perms.moderate_members:
+                missing.append("Moderar miembros")
+            if missing:
+                return await interaction.response.send_message(
+                    "no active la moderacion en vivo todavía: dale a Papu estos permisos y vuelve a ejecutar el comando: "
+                    + ", ".join(missing) + ".",
+                    ephemeral=True,
+                )
+
         config["ai_enabled"] = activar
-        # Modo en vivo: solo casos graves y de confianza muy alta reciben acciones.
         config["ai_live_actions"] = activar
         config["ai_dry_run"] = False
         save_json(SETTINGS_FILE, self.settings)
@@ -298,17 +333,6 @@ class Moderacion(commands.Cog):
         extras = []
         if activar and not getattr(self.bot, "groq_client", None):
             extras.append("Falta GROQ_API_KEY; sin ella no se analizaran mensajes.")
-        if activar:
-            permissions = interaction.guild.me.guild_permissions if interaction.guild.me else None
-            missing = []
-            if not permissions or not permissions.manage_messages:
-                missing.append("Gestionar mensajes")
-            if not permissions or not permissions.moderate_members:
-                missing.append("Moderar miembros")
-            if missing:
-                extras.append("A Papu le faltan permisos para algunas acciones: " + ", ".join(missing) + ".")
-            if not self.log_channels.get(key):
-                extras.append("Configura /setlogchannel para que los casos lleguen al staff.")
         await interaction.response.send_message(
             f"moderacion IA {state}. Los casos de gravedad 3, confianza >=95% y categoria sexual/amenaza/odio/acoso pueden borrar el mensaje y aplicar timeout de 24 horas. "
             "Los casos menos concluyentes solo se registran; no se expulsa ni banea automaticamente. "
@@ -317,7 +341,7 @@ class Moderacion(commands.Cog):
         )
         await self.log(interaction.guild, "Configuracion de moderacion IA",
             f"Alertas: {state}. Acciones en vivo: {'activadas' if activar else 'desactivadas'}.")
-        
+
     @commands.Cog.listener()
     async def on_message(self, message):
         if not message.guild or message.author.bot or not message.content.strip():
