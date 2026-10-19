@@ -64,7 +64,8 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 
 - Papu busca automaticamente cuando le preguntan por tracklists/listas de canciones y otras consultas factuales conocidas, y cuando alguien escribe comandos como `busca`, `buscala`, `investiga` o `averigua`.
 - Si el comando es solo `busca`, usa los mensajes previos del usuario para reconstruir el tema.
-- Los resultados proceden de la biblioteca `ddgs` y se pasan al modelo como datos externos no confiables; la respuesta debe enlazar las fuentes exactas y no inventar detalles.
+- La busqueda usa **Google como motor principal** (`backend="google, brave"`), con Brave como respaldo si Google no responde o bloquea la peticion. Se usa la region `es-es` para priorizar resultados de Espana.
+- Los resultados de búsqueda se pasan al modelo como datos externos no confiables; la respuesta debe enlazar las fuentes exactas y no inventar detalles.
 - Si no aparecen resultados, Papu explica que la busqueda fallo en vez de fabricar una respuesta.
 - La busqueda necesita acceso a internet desde el alojamiento. No requiere otra API key, pero los motores pueden aplicar limites o bloquear peticiones.
 - Los temas de busqueda se envian a proveedores externos. Cuando alguien escribe solo `busca`, Papu reutiliza unicamente el tema factual reciente y aclaraciones cortas (como año o edicion), no conversaciones personales sin relacion.
