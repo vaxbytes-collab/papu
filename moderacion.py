@@ -2,11 +2,11 @@
 
 La IA nunca sanciona ni elimina mensajes por su cuenta: sus alertas requieren revision humana.
 """
+import asyncio
 import json
 import os
 import re
 import tempfile
-import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -18,7 +18,7 @@ DATA_DIR = Path(os.getenv("PAPU_DATA_DIR", "."))
 LOGS_FILE = DATA_DIR / "log_channels.json"
 WARNS_FILE = DATA_DIR / "warns.json"
 SETTINGS_FILE = DATA_DIR / "moderation_settings.json"
-AI_COOLDOWN_SECONDS = 4
+AI_MAX_CONCURRENT_CHECKS = 3
 
 
 def load_json(path, default):
@@ -69,7 +69,7 @@ class Moderacion(commands.Cog):
         self.warns = load_json(WARNS_FILE, {})
         self.log_channels = load_json(LOGS_FILE, {})
         self.settings = load_json(SETTINGS_FILE, {})
-        self.ai_last_check = {}
+        self.ai_semaphore = asyncio.Semaphore(AI_MAX_CONCURRENT_CHECKS)
 
     def guild_key(self, guild):
         return str(guild.id)
@@ -165,12 +165,10 @@ class Moderacion(commands.Cog):
         await self.log(interaction.guild, "⚙️ Canal de chat configurado", message)
 
     async def check_message(self, message):
-        key = (message.guild.id, message.author.id)
-        now = time.monotonic()
-        if now - self.ai_last_check.get(key, 0) < AI_COOLDOWN_SECONDS:
-            return
-        self.ai_last_check[key] = now
-        verdict = await self.classify(message.content)
+        # Analiza cada mensaje de texto cuando el servidor activa la funcion.
+        # El semaforo limita concurrencia, no descarta mensajes.
+        async with self.ai_semaphore:
+            verdict = await self.classify(message.content)
         if verdict and verdict["flag"] and verdict["confidence"] >= 0.72:
             await self.log(
                 message.guild,
