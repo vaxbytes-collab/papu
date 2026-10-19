@@ -120,7 +120,7 @@ class CommandRegistryTests(unittest.TestCase):
             "reto_sano",
             "mood_michi",
             "palabra_aleatoria",
-            "duelo_aleatorio",
+            "duelo",
             "completa_frase",
             "verso_michi",
             "npc",
