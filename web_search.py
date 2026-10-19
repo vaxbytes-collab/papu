@@ -27,7 +27,7 @@ _CONTEXT_LOOKUP = re.compile(
 )
 _GENERIC_HISTORY = {
     "busca", "buscala", "buscalo", "buscame", "busca eso", "hazlo",
-    "de 2018", "de 2019", "de 2020", "busca en internet",
+    "busca en internet",
 }
 
 
