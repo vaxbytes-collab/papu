@@ -134,6 +134,77 @@ class Seguridad(commands.Cog):
         except (discord.Forbidden, discord.HTTPException):
             return
 
+    async def apply_security_rule(
+        self,
+        message: discord.Message,
+        *,
+        category: str,
+        severity: int,
+        reason: str,
+        timeout_seconds: int = 0,
+    ) -> bool:
+        """Aplica un filtro solo cuando el canal privado de logs esta operativo y deja una ficha completa."""
+        log_config = load_json("log_channels.json", {})
+        raw_log_id = log_config.get(str(message.guild.id))
+        log_channel = message.guild.get_channel(int(raw_log_id)) if raw_log_id else None
+        bot_member = message.guild.me
+        permissions = log_channel.permissions_for(bot_member) if log_channel and bot_member else None
+        if not permissions or not (permissions.view_channel and permissions.send_messages):
+            print(f"[WARN] Filtro {category} no aplicado en servidor {message.guild.id}: falta un canal de logs operativo.")
+            return False
+
+        case_id = next_case_id(message.guild.id)
+        actions = []
+        deletion_succeeded = False
+        moderation_cog = self.bot.get_cog("Moderacion")
+        deleted_ids = getattr(moderation_cog, "case_deleted_ids", None)
+        try:
+            if deleted_ids is not None:
+                deleted_ids.add(message.id)
+            await message.delete(reason=f"Papu filtro {category}, caso #{case_id}")
+            deletion_succeeded = True
+            actions.append("mensaje eliminado")
+        except (discord.Forbidden, discord.HTTPException):
+            if deleted_ids is not None:
+                deleted_ids.discard(message.id)
+            actions.append("no se pudo borrar el mensaje")
+        if deletion_succeeded and timeout_seconds > 0:
+            try:
+                await message.author.timeout(
+                    timedelta(seconds=timeout_seconds),
+                    reason=f"Papu filtro {category}, caso #{case_id}",
+                )
+                actions.append(f"timeout aplicado durante {timeout_seconds} segundos")
+            except (discord.Forbidden, discord.HTTPException, AttributeError):
+                actions.append("no se pudo aplicar el timeout")
+        if deletion_succeeded and all(not action.startswith("no se pudo") for action in actions):
+            status = "ACCION APLICADA: " + ", ".join(actions) + "."
+        elif deletion_succeeded:
+            status = "ACCION PARCIAL: " + "; ".join(actions) + "."
+        else:
+            status = "ACCION FALLIDA: " + "; ".join(actions) + "."
+
+        case_content = make_case_content(
+            case_id=case_id,
+            title="🚨 caso grave" if severity == 3 else ("⚠️ posible infraccion" if severity == 2 else "🛡️ filtro automatico"),
+            username=str(message.author),
+            user_id=message.author.id,
+            channel_name=getattr(message.channel, "name", "canal desconocido"),
+            channel_id=getattr(message.channel, "id", None),
+            category=category,
+            severity=severity,
+            confidence=1.0,
+            reason=reason,
+            message_text=message.content,
+            message_url=getattr(message, "jump_url", None),
+            status=status,
+        )
+        try:
+            await log_channel.send(content=case_content, allowed_mentions=discord.AllowedMentions.none())
+        except (discord.Forbidden, discord.HTTPException):
+            print(f"[WARN] No pude registrar el caso #{case_id} en el servidor {message.guild.id}")
+        return deletion_succeeded
+
     @app_commands.command(name="antispam", description="Activa o configura la proteccion contra spam")
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(administrator=True)
