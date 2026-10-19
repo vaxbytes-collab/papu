@@ -1,7 +1,7 @@
 import unittest
 from collections import deque
 
-from seguridad import contains_discord_invite, count_recent_events
+from seguridad import contains_discord_invite, contains_suspicious_link, count_recent_events
 
 
 class SecurityHelpersTests(unittest.TestCase):
@@ -26,6 +26,28 @@ class SecurityHelpersTests(unittest.TestCase):
         ):
             with self.subTest(text=text):
                 self.assertFalse(contains_discord_invite(text))
+
+    def test_known_tracking_and_phishing_domains_are_flagged(self):
+        samples = (
+            "https://grabify.link/abcd",
+            "www.iplogger.org/track?id=123",
+            "https://sub.discordnitro.com/free",
+            "steamcomunnity.com/gift",
+        )
+        for text in samples:
+            with self.subTest(text=text):
+                self.assertTrue(contains_suspicious_link(text))
+
+    def test_regular_links_and_domains_lookalikes_are_not_flagged(self):
+        samples = (
+            "https://discord.com/channels/123/456",
+            "https://example.com/?next=grabify.link",
+            "https://mygrabify.link/",
+            "https://steamcommunity.com/",
+        )
+        for text in samples:
+            with self.subTest(text=text):
+                self.assertFalse(contains_suspicious_link(text))
 
     def test_recent_event_window_discards_old_entries(self):
         events = deque([4.0, 6.0, 8.0])
