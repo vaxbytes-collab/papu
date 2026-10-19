@@ -25,11 +25,15 @@ def _select_data_dir(environ=None, cwd=None) -> Path:
     """Elige el directorio de datos según la configuración y el alojamiento."""
     env = os.environ if environ is None else environ
     base = Path(cwd) if cwd is not None else Path.cwd()
+    is_render = bool(env.get("RENDER_SERVICE_ID") or env.get("RENDER_INSTANCE_ID"))
     configured = str(env.get("PAPU_DATA_DIR", "") or "").strip()
     if configured:
         path = Path(configured).expanduser()
-        return path if path.is_absolute() else base / path
-    if env.get("RENDER_SERVICE_ID") or env.get("RENDER_INSTANCE_ID"):
+        if path.is_absolute():
+            return path
+        # En Render, incluso una ruta relativa debe quedar dentro del disco persistente.
+        return (Path("/var/data") if is_render else base) / path
+    if is_render:
         return Path("/var/data")
     return base / "data"
 
@@ -125,13 +129,19 @@ def save_json(name: str, value) -> None:
 # Intenta rescatar los JSON antiguos si siguen presentes en el despliegue actual.
 _migrate_legacy_data()
 
-# Avisa de forma visible si Render está usando su sistema de archivos efímero.
-if (
-    (os.getenv("RENDER_SERVICE_ID") or os.getenv("RENDER_INSTANCE_ID"))
-    and DATA_DIR.resolve() == Path("/var/data")
-    and not DATA_DIR.is_mount()
+# Avisa de forma visible si Render esta usando rutas que no son persistentes.
+_RENDER_ENV = bool(os.getenv("RENDER_SERVICE_ID") or os.getenv("RENDER_INSTANCE_ID"))
+_RENDER_DATA_ROOT = Path("/var/data")
+try:
+    _DATA_DIR_UNDER_RENDER_DISK = DATA_DIR.resolve().is_relative_to(_RENDER_DATA_ROOT)
+except OSError:
+    _DATA_DIR_UNDER_RENDER_DISK = False
+
+if _RENDER_ENV and (
+    not _DATA_DIR_UNDER_RENDER_DISK or not _RENDER_DATA_ROOT.is_mount()
 ):
     logging.warning(
-        "[STORAGE] /var/data no es un disco montado. "
-        "Adjunta un Persistent Disk de Render en /var/data o los datos se perderan al desplegar."
+        "[STORAGE] Los datos no tienen un disco persistente montado en /var/data. "
+        "Configura un Persistent Disk de Render en /var/data y define PAPU_DATA_DIR "
+        "como /var/data (o una subcarpeta dentro). De lo contrario, los datos se perderan al desplegar."
     )
