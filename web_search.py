@@ -1,4 +1,5 @@
 """busqueda web para el chat de papu."""
+import logging
 import re
 from typing import Iterable
 from urllib.parse import urlparse
@@ -148,6 +149,7 @@ def search_web(query: str, max_results: int = 5) -> list[dict[str, str]]:
         except Exception:
             # Google a veces bloquea o no devuelve resultados desde algunos alojamientos.
             # No dejes que ese fallo interrumpa el chat; continua con el siguiente motor.
+            logging.warning("[WARN] fallo el motor de busqueda %s; probando el siguiente", backend)
             continue
 
         output: list[dict[str, str]] = []
@@ -166,8 +168,10 @@ def search_web(query: str, max_results: int = 5) -> list[dict[str, str]]:
             if len(output) >= max_results:
                 break
         if output:
+            logging.info("[OK] busqueda completada con %s (%s resultados)", backend, len(output))
             return output
 
+    logging.warning("[WARN] ningun motor devolvio resultados para la consulta")
     return []
 
 def format_search_context(query: str, results: list[dict[str, str]]) -> str:
