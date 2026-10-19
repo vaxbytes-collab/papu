@@ -238,9 +238,37 @@ class Seguridad(commands.Cog):
             inline=False,
         )
         embed.add_field(
-            name="Invitaciones",
+            name="Invitaciones / enlaces sospechosos",
             value="bloqueo activado" if invites.get("enabled") else "bloqueo desactivado",
             inline=False,
+        )
+        mentions = cfg.get("anti_mentions", {})
+        embed.add_field(
+            name="Anti-menciones",
+            value=f"{'activado' if mentions.get('enabled') else 'desactivado'} · limite {mentions.get('limit', 4)}",
+            inline=True,
+        )
+        repeat = cfg.get("anti_repeat", {})
+        embed.add_field(
+            name="Anti-repeticion",
+            value=f"{'activado' if repeat.get('enabled') else 'desactivado'} · {repeat.get('repeats', 3)} en {repeat.get('window', 12)} s",
+            inline=True,
+        )
+        caps = cfg.get("caps_filter", {})
+        embed.add_field(
+            name="Filtro caps",
+            value=f"{'activado' if caps.get('enabled') else 'desactivado'} · {caps.get('percent', 85)}%",
+            inline=True,
+        )
+        embed.add_field(
+            name="Filtro personalizado",
+            value=f"{len(cfg.get('blocked_words', []))} palabra(s)/frase(s) configurada(s)",
+            inline=True,
+        )
+        embed.add_field(
+            name="Reportes",
+            value="canal configurado" if cfg.get("report_channel") else "sin configurar",
+            inline=True,
         )
         embed.set_footer(text="Configura un canal de logs con /setlogchannel para recibir alertas.")
         await interaction.response.send_message(embed=embed, ephemeral=True)
