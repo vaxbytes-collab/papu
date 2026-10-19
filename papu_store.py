@@ -18,6 +18,7 @@ PERSISTED_JSON_FILES = (
     "log_channels.json",
     "warns.json",
     "moderation_settings.json",
+    "chat_histories.json",
 )
 _LOCK = RLock()
 
