@@ -41,6 +41,13 @@ python main.py
 
 Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar los comandos globales. No despliegues una rama de desarrollo en un servidor principal sin probarla primero.
 
+## Idioma del chat de Papu
+
+- Papu responde en español latinoamericano por defecto y solo cambia de idioma si la persona lo pide o conversa claramente en otro idioma.
+- Los números, emojis o mensajes cortos no se interpretan como una petición de hablar inglés.
+- Si el primer mensaje es ambiguo y solo contiene un número, Papu pregunta en español qué quiso decir, sin llamar a la IA.
+- El chat usa un tiempo de espera para que los fallos del proveedor no dejen la conversación esperando indefinidamente.
+
 ## Comandos destacados
 
 ### Organizacion y comunidad
