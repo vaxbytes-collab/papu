@@ -11,7 +11,7 @@ from groq import Groq
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+# Evita esperas largas y reintentos ocultos cuando el proveedor no responde.\ngroq_client = Groq(api_key=GROQ_API_KEY, timeout=25.0, max_retries=0) if GROQ_API_KEY else None
 
 app = Flask(__name__)
 
@@ -60,6 +60,7 @@ PROMPT_SISTEMA = (
     "No afirmes haber aplicado sanciones ni cambiado configuraciones."
 )
 HISTORIALES_USUARIOS = {}
+BLOQUEOS_USUARIOS = {}
 MAX_HISTORIAL = 13
 
 @bot.event
@@ -72,43 +73,82 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    cog = bot.get_cog("Moderacion")
-    auto_reply = bool(cog and cog.should_reply_without_mention(message))
-    if (bot.user and bot.user in message.mentions) or auto_reply:
-        contenido = message.content
-        if bot.user:
-            contenido = contenido.replace(f"<@{bot.user.id}>", "")
-            contenido = contenido.replace(f"<@!{bot.user.id}>", "")
-        contenido = contenido.strip()
-        if not contenido and not message.attachments:
-            await message.channel.send("ke paso papu? tirame una duda o una fotito :v")
-        elif bot.groq_client is None:
-            await message.channel.send("falta configurar GROQ_API_KEY para que funcione la ia, papu.")
-        else:
-            user_key = f"{message.guild.id if message.guild else 'dm'}:{message.author.id}"
-            history = HISTORIALES_USUARIOS.setdefault(
-                user_key, [{"role": "system", "content": PROMPT_SISTEMA}]
-            )
-            history.append({"role": "user", "content": (contenido or "El usuario adjunto una imagen.")[:4000]})
-            async with message.channel.typing():
-                try:
-                    response = await asyncio.to_thread(
-                        bot.groq_client.chat.completions.create,
-                        model=os.getenv("GROQ_CHAT_MODEL", "llama-3.1-8b-instant"),
-                        messages=history,
-                        temperature=0.7,
-                        max_tokens=700,
-                    )
-                    answer = (response.choices[0].message.content or "miau, no salio respuesta :v")[:1900]
-                    history.append({"role": "assistant", "content": answer})
-                    HISTORIALES_USUARIOS[user_key] = [history[0]] + history[-MAX_HISTORIAL:]
-                    await message.channel.send(answer, allowed_mentions=discord.AllowedMentions.none())
-                except Exception:
-                    HISTORIALES_USUARIOS.pop(user_key, None)
-                    print("[ERROR] Fallo la llamada a Groq", exc_info=True)
-                    await message.channel.send("se me trabaron las patitas con la ia :'v intenta de nuevo en un rato.")
+    try:
+        cog = bot.get_cog("Moderacion")
+        auto_reply = bool(cog and cog.should_reply_without_mention(message))
+        mentioned = bool(bot.user and bot.user in message.mentions)
 
-    await bot.process_commands(message)
+        if mentioned or auto_reply:
+            contenido = message.content
+            if bot.user:
+                contenido = contenido.replace(f"<@{bot.user.id}>", "")
+                contenido = contenido.replace(f"<@!{bot.user.id}>", "")
+            contenido = contenido.strip()
+
+            if not contenido and not message.attachments:
+                await message.channel.send("ke paso papu? tirame una duda o una fotito :v")
+            elif bot.groq_client is None:
+                await message.channel.send("falta configurar GROQ_API_KEY para que funcione la ia, papu.")
+            else:
+                user_key = f"{message.guild.id if message.guild else 'dm'}:{message.author.id}"
+                lock = BLOQUEOS_USUARIOS.setdefault(user_key, asyncio.Lock())
+
+                # Serializa los mensajes del mismo usuario para que el historial
+                # no cambie mientras la petición está en curso.
+                async with lock:
+                    history = HISTORIALES_USUARIOS.setdefault(
+                        user_key, [{"role": "system", "content": PROMPT_SISTEMA}]
+                    )
+                    history.append({
+                        "role": "user",
+                        "content": (contenido or "El usuario adjunto una imagen.")[:4000],
+                    })
+                    answer = None
+                    keep_turn = False
+
+                    try:
+                        async with message.channel.typing():
+                            response = await asyncio.wait_for(
+                                asyncio.to_thread(
+                                    bot.groq_client.chat.completions.create,
+                                    model=os.getenv("GROQ_CHAT_MODEL", "llama-3.1-8b-instant"),
+                                    messages=[dict(item) for item in history],
+                                    temperature=0.7,
+                                    max_tokens=700,
+                                ),
+                                timeout=30.0,
+                            )
+                        answer = (response.choices[0].message.content or "").strip()
+                        if not answer:
+                            answer = "miau, la IA devolvió una respuesta vacía :v"
+                        answer = answer[:1900]
+                        history.append({"role": "assistant", "content": answer})
+                        HISTORIALES_USUARIOS[user_key] = [history[0]] + history[-MAX_HISTORIAL:]
+                        keep_turn = True
+                    except asyncio.TimeoutError:
+                        answer = "Papu se quedó esperando a la IA y agotó el tiempo de espera 😿. Prueba otra vez en unos segundos."
+                        print("[WARN] Groq agotó el tiempo de espera al responder un mensaje.")
+                    except Exception:
+                        answer = "se me trabaron las patitas con la IA :'v intenta de nuevo en un rato."
+                        print("[ERROR] Falló la llamada a Groq", exc_info=True)
+                    finally:
+                        # No dejes preguntas fallidas acumuladas en el historial.
+                        if not keep_turn and history and history[-1].get("role") == "user":
+                            history.pop()
+
+                    try:
+                        await message.channel.send(
+                            answer,
+                            allowed_mentions=discord.AllowedMentions.none(),
+                        )
+                    except discord.HTTPException:
+                        print(
+                            "[ERROR] Groq terminó, pero Discord rechazó el mensaje. "
+                            "Comprueba View Channel y Send Messages en el canal.",
+                            exc_info=True,
+                        )
+    finally:
+        await bot.process_commands(message)
 
 if __name__ == "__main__":
     if not DISCORD_TOKEN:
