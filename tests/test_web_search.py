@@ -61,6 +61,13 @@ class WebSearchTests(unittest.TestCase):
         with patch("web_search.DDGS") as ddgs_class:
             ddgs_class.return_value.text.return_value = fake_results
             results = search_web("Ye tracklist")
+            ddgs_class.return_value.text.assert_called_once_with(
+                "Ye tracklist",
+                region="es-es",
+                safesearch="moderate",
+                max_results=5,
+                backend="google, brave",
+            )
         self.assertEqual(len(results), 2)
         self.assertEqual(results[0]["url"], "https://music.example/Album")
         self.assertTrue(all(x["url"].startswith("https://") for x in results))
