@@ -28,15 +28,16 @@ class SecurityHelpersTests(unittest.TestCase):
                 self.assertFalse(contains_discord_invite(text))
 
     def test_recent_event_window_discards_old_entries(self):
-        events = deque([1.0, 2.0, 4.0, 8.0])
+        events = deque([4.0, 6.0, 8.0])
         count = count_recent_events(events, now=10.0, window_seconds=5)
         self.assertEqual(count, 2)
-        self.assertEqual(list(events), [8.0])
+        self.assertEqual(list(events), [6.0, 8.0])
 
     def test_recent_event_window_keeps_events_on_cutoff(self):
         events = deque([4.9, 5.0, 5.1])
         count = count_recent_events(events, now=8.0, window_seconds=3)
-        self.assertEqual(count, 3)
+        self.assertEqual(count, 2)
+        self.assertEqual(list(events), [5.0, 5.1])
 
 
 if __name__ == "__main__":
