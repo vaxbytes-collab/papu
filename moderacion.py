@@ -434,5 +434,106 @@ class Moderacion(commands.Cog):
         await self.log(interaction.guild, "🔓 Canal desbloqueado", f"Staff: {interaction.user}\nCanal: {interaction.channel.mention}")
 
 
+
+    @app_commands.command(name="purge_usuario", description="Borra mensajes recientes de un usuario en este canal")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.bot_has_permissions(manage_messages=True, read_message_history=True)
+    async def purge_usuario(self, interaction: discord.Interaction, usuario: discord.Member, cantidad: app_commands.Range[int, 1, 100]):
+        await interaction.response.defer(ephemeral=True)
+        deleted = await interaction.channel.purge(
+            limit=cantidad,
+            check=lambda message: message.author.id == usuario.id,
+            reason=f"Limpieza solicitada por {interaction.user}",
+        )
+        await interaction.followup.send(f"🧹 borre {len(deleted)} mensajes de {discord.utils.escape_mentions(usuario.display_name)} en este canal.", ephemeral=True)
+        await self.log(interaction.guild, "🧹 Limpieza por usuario", f"Staff: {interaction.user} ({interaction.user.id})\nUsuario: {usuario} ({usuario.id})\nCanal: {interaction.channel.mention}\nMensajes eliminados: {len(deleted)}", discord.Color.orange())
+
+    @app_commands.command(name="purge_bots", description="Borra mensajes recientes enviados por bots en este canal")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.bot_has_permissions(manage_messages=True, read_message_history=True)
+    async def purge_bots(self, interaction: discord.Interaction, cantidad: app_commands.Range[int, 1, 100]):
+        await interaction.response.defer(ephemeral=True)
+        deleted = await interaction.channel.purge(
+            limit=cantidad,
+            check=lambda message: message.author.bot or message.webhook_id is not None,
+            reason=f"Limpieza de mensajes de bots solicitada por {interaction.user}",
+        )
+        await interaction.followup.send(f"🧹 borre {len(deleted)} mensajes de bots o webhooks.", ephemeral=True)
+        await self.log(interaction.guild, "🧹 Limpieza de bots", f"Staff: {interaction.user}\nCanal: {interaction.channel.mention}\nMensajes eliminados: {len(deleted)}", discord.Color.orange())
+
+    @app_commands.command(name="apodo", description="Cambia o restablece el apodo de un miembro")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_nicknames=True)
+    @app_commands.checks.bot_has_permissions(manage_nicknames=True)
+    async def apodo(self, interaction: discord.Interaction, usuario: discord.Member, nuevo: app_commands.Range[str, 1, 32] = None):
+        guild = interaction.guild
+        bot_member = guild.me
+        if usuario.id == guild.owner_id or (bot_member and usuario.top_role >= bot_member.top_role):
+            return await interaction.response.send_message("no puedo modificar el apodo de alguien con un rol igual o superior al mio.", ephemeral=True)
+        if interaction.user.id != guild.owner_id and usuario.top_role >= interaction.user.top_role:
+            return await interaction.response.send_message("tu rol debe estar por encima del miembro que quieres editar.", ephemeral=True)
+        reason = f"Apodo modificado por {interaction.user}"
+        try:
+            await usuario.edit(nick=nuevo, reason=reason)
+        except (discord.Forbidden, discord.HTTPException):
+            return await interaction.response.send_message("discord rechazo el cambio; revisa los permisos y la jerarquia de roles.", ephemeral=True)
+        label = "restablecido" if nuevo is None else "actualizado"
+        await interaction.response.send_message(f"listo, apodo {label} para {discord.utils.escape_mentions(usuario.display_name)}.", ephemeral=True)
+        await self.log(guild, "✏️ Apodo modificado", f"Staff: {interaction.user}\nUsuario: {usuario} ({usuario.id})\nNuevo apodo: {nuevo or '[nombre de usuario]'}")
+
+    @app_commands.command(name="rol_dar", description="Asigna un rol inferior al rol mas alto de Papu")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_roles=True)
+    @app_commands.checks.bot_has_permissions(manage_roles=True)
+    async def rol_dar(self, interaction: discord.Interaction, usuario: discord.Member, rol: discord.Role):
+        guild = interaction.guild
+        bot_member = guild.me
+        if rol.is_default() or rol.managed or (bot_member and rol >= bot_member.top_role):
+            return await interaction.response.send_message("no puedo asignar ese rol por jerarquia o porque es administrado.", ephemeral=True)
+        if interaction.user.id != guild.owner_id and rol >= interaction.user.top_role:
+            return await interaction.response.send_message("solo puedes gestionar roles inferiores al tuyo.", ephemeral=True)
+        if usuario.id == guild.owner_id or (bot_member and usuario.top_role >= bot_member.top_role):
+            return await interaction.response.send_message("no puedo modificar los roles de ese miembro por jerarquia.", ephemeral=True)
+        try:
+            await usuario.add_roles(rol, reason=f"Asignado por {interaction.user}")
+        except (discord.Forbidden, discord.HTTPException):
+            return await interaction.response.send_message("discord rechazo la asignacion; revisa los permisos.", ephemeral=True)
+        await interaction.response.send_message(f"✅ rol {discord.utils.escape_mentions(rol.name)} asignado a {discord.utils.escape_mentions(usuario.display_name)}.", ephemeral=True)
+        await self.log(guild, "🎭 Rol asignado", f"Staff: {interaction.user}\nUsuario: {usuario} ({usuario.id})\nRol: {rol.name} ({rol.id})")
+
+    @app_commands.command(name="rol_quitar", description="Retira un rol de un miembro respetando jerarquias")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_roles=True)
+    @app_commands.checks.bot_has_permissions(manage_roles=True)
+    async def rol_quitar(self, interaction: discord.Interaction, usuario: discord.Member, rol: discord.Role):
+        guild = interaction.guild
+        bot_member = guild.me
+        if rol.is_default() or rol.managed or (bot_member and rol >= bot_member.top_role):
+            return await interaction.response.send_message("no puedo retirar ese rol por jerarquia o porque es administrado.", ephemeral=True)
+        if interaction.user.id != guild.owner_id and rol >= interaction.user.top_role:
+            return await interaction.response.send_message("solo puedes gestionar roles inferiores al tuyo.", ephemeral=True)
+        if usuario.id == guild.owner_id or (bot_member and usuario.top_role >= bot_member.top_role):
+            return await interaction.response.send_message("no puedo modificar los roles de ese miembro por jerarquia.", ephemeral=True)
+        try:
+            await usuario.remove_roles(rol, reason=f"Retirado por {interaction.user}")
+        except (discord.Forbidden, discord.HTTPException):
+            return await interaction.response.send_message("discord rechazo la retirada; revisa los permisos.", ephemeral=True)
+        await interaction.response.send_message(f"✅ rol {discord.utils.escape_mentions(rol.name)} retirado de {discord.utils.escape_mentions(usuario.display_name)}.", ephemeral=True)
+        await self.log(guild, "🎭 Rol retirado", f"Staff: {interaction.user}\nUsuario: {usuario} ({usuario.id})\nRol: {rol.name} ({rol.id})")
+
+    @app_commands.command(name="timeout_estado", description="Consulta cuando termina el timeout de un miembro")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(moderate_members=True)
+    async def timeout_estado(self, interaction: discord.Interaction, usuario: discord.Member):
+        until = usuario.timed_out_until
+        if until is None:
+            return await interaction.response.send_message(f"{discord.utils.escape_mentions(usuario.display_name)} no tiene timeout activo.", ephemeral=True)
+        await interaction.response.send_message(
+            f"⏱️ timeout de {discord.utils.escape_mentions(usuario.display_name)} termina <t:{int(until.timestamp())}:F> (<t:{int(until.timestamp())}:R>).",
+            ephemeral=True,
+        )
+
 async def setup(bot):
     await bot.add_cog(Moderacion(bot))
