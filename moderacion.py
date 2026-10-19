@@ -374,6 +374,41 @@ class Moderacion(commands.Cog):
             lines.append(f"{index}. {safe_text(reason, 180)}")
         await interaction.response.send_message(f"Advertencias de {usuario}:\n" + "\n".join(lines), ephemeral=True)
 
+    @app_commands.command(name="unwarn", description="Retira una advertencia concreta de un usuario")
+    @app_commands.checks.has_permissions(manage_messages=True)
+    async def unwarn(self, interaction: discord.Interaction, usuario: discord.Member,
+                     numero: app_commands.Range[int, 1, 1000]):
+        guild_key, user_key = str(interaction.guild_id), str(usuario.id)
+        entries = self.warns.get(guild_key, {}).get(user_key, [])
+        if numero > len(entries):
+            return await interaction.response.send_message(
+                f"Advertencia #{numero} no encontrada. Este usuario tiene {len(entries)}.", ephemeral=True
+            )
+        removed = entries.pop(numero - 1)
+        save_json(WARNS_FILE, self.warns)
+        reason = removed.get("reason", "sin motivo") if isinstance(removed, dict) else str(removed)
+        await interaction.response.send_message(
+            f"Se retiró la advertencia #{numero} de {usuario.mention}.", ephemeral=True
+        )
+        await self.log(interaction.guild, "↩️ Advertencia retirada",
+            f"Usuario: {usuario} ({usuario.id})\\nStaff: {interaction.user}\\n"
+            f"Número: {numero}\\nMotivo original: {safe_text(reason)}", discord.Color.gold())
+
+    @app_commands.command(name="diagnostico", description="Comprueba la configuracion de Papu")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def diagnostico(self, interaction: discord.Interaction):
+        key = self.guild_key(interaction.guild)
+        settings = self.settings.get(key, {})
+        channel_id = self.log_channels.get(key)
+        channel = interaction.guild.get_channel(int(channel_id)) if channel_id else None
+        embed = make_embed("🩺 Diagnóstico de Papu",
+            f"IA de moderación: {'activada' if settings.get('ai_enabled') else 'desactivada'}\\n"
+            f"Groq disponible: {'sí' if getattr(self.bot, 'groq_client', None) else 'no'}\\n"
+            f"Canal de logs: {channel.mention if channel else 'sin configurar'}\\n"
+            f"Canal de chat sin mención: {'configurado' if settings.get('chat_channel') else 'desactivado'}",
+            discord.Color.green() if channel and getattr(self.bot, 'groq_client', None) else discord.Color.orange())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
     @app_commands.command(name="clearwarns", description="Borra las advertencias de un usuario")
     @app_commands.checks.has_permissions(administrator=True)
     async def clearwarns(self, interaction: discord.Interaction, usuario: discord.Member):
