@@ -13,7 +13,7 @@ from discord.ext import commands
 
 from groq_config import get_groq_model
 from papu_store import DATA_DIR, load_json as load_stored_json, save_json as save_stored_json
-from moderation_cases import make_case_embed, next_case_id
+from moderation_cases import make_case_content, next_case_id
 
 LOGS_FILE = DATA_DIR / "log_channels.json"
 WARNS_FILE = DATA_DIR / "warns.json"
@@ -128,7 +128,7 @@ class Moderacion(commands.Cog):
             print("[WARN] Fallo el analisis de IA", exc_info=True)
             return None
 
-    async def log_case(self, guild, embed):
+    async def log_case(self, guild, content):
         if guild is None:
             return
         channel_id = self.log_channels.get(self.guild_key(guild))
@@ -136,7 +136,7 @@ class Moderacion(commands.Cog):
         if channel is None:
             return
         try:
-            await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            await channel.send(content=content, allowed_mentions=discord.AllowedMentions.none())
         except (discord.Forbidden, discord.HTTPException):
             print(f"[WARN] No pude enviar el caso de moderacion al servidor {guild.id}")
 
@@ -154,8 +154,6 @@ class Moderacion(commands.Cog):
         case_id = next_case_id(message.guild.id)
         actions = []
         attempted_action = False
-
-        # Solo se aplican sanciones en vivo a casos inequívocamente graves y de alta confianza.
         severe_categories = {"sexual", "threat", "hate", "harassment"}
         live_action = (
             settings.get("ai_enabled", False)
@@ -188,13 +186,15 @@ class Moderacion(commands.Cog):
                     actions.append("timeout aplicado durante 24 horas")
                 except (discord.Forbidden, discord.HTTPException):
                     actions.append("no se pudo aplicar timeout (revisar Permisos y jerarquia de roles)")
+        elif settings.get("ai_live_actions", False):
+            actions.append("sin sancion automatica: gravedad/confianza/categoria no alcanzan el umbral de accion")
         else:
-            if settings.get("ai_live_actions", False):
-                actions.append("sin sancion automatica: gravedad/confianza/categoria no alcanzan el umbral de accion")
-            else:
-                actions.append("sin sancion automatica: modo de acciones en vivo desactivado")
+            actions.append("sin sancion automatica: modo de acciones en vivo desactivado")
 
-        if attempted_action and all(not item.startswith("no se pudo") and not item.startswith("timeout no aplicado") for item in actions):
+        if attempted_action and all(
+            not item.startswith("no se pudo") and not item.startswith("timeout no aplicado")
+            for item in actions
+        ):
             status = "ACCION APLICADA: " + ", ".join(actions) + "."
         elif attempted_action:
             status = "ACCION PARCIAL: " + "; ".join(actions) + "."
@@ -202,8 +202,7 @@ class Moderacion(commands.Cog):
             status = "REGISTRO: " + "; ".join(actions) + "."
 
         title = "🚨 caso grave" if severity == 3 else ("⚠️ posible infraccion" if severity == 2 else "🛡️ alerta de moderacion")
-        color = discord.Color.red() if severity == 3 else (discord.Color.orange() if severity == 2 else discord.Color.gold())
-        embed = make_case_embed(
+        case_content = make_case_content(
             case_id=case_id,
             title=title,
             username=str(message.author),
@@ -217,9 +216,8 @@ class Moderacion(commands.Cog):
             message_text=message.content,
             message_url=getattr(message, "jump_url", None),
             status=status,
-            color=color,
         )
-        await self.log_case(message.guild, embed)
+        await self.log_case(message.guild, case_content)
 
     def should_reply_without_mention(self, message):
         """Solo responde sin mencion en el canal opt-in configurado por un admin."""
@@ -375,7 +373,7 @@ class Moderacion(commands.Cog):
             )
         label = "posible infraccion" if result["flag"] else "sin indicios claros"
         case_id = next_case_id(interaction.guild_id)
-        embed = make_case_embed(
+        case_content = make_case_content(
             case_id=case_id,
             title="Revision manual de IA" if result["flag"] else "Revision manual: sin indicios claros",
             username=str(interaction.user),
@@ -389,11 +387,10 @@ class Moderacion(commands.Cog):
             message_text=texto,
             message_url=None,
             status=f"REVISION MANUAL: {label}; no se aplico ninguna sancion desde /modcheck.",
-            color=discord.Color.orange() if result["flag"] else discord.Color.green(),
         )
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(content=case_content, ephemeral=True)
         if result["flag"]:
-            await self.log_case(interaction.guild, embed)
+            await self.log_case(interaction.guild, case_content)
 
     @app_commands.command(name="kick", description="Expulsa a un usuario")
     @app_commands.checks.has_permissions(kick_members=True)
