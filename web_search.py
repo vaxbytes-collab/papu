@@ -89,12 +89,26 @@ def build_search_query(text: str, history: Iterable[dict] = ()) -> str:
                 continue
             user_items.append(prior)
 
-        # Con una orden suelta como "busca", reutiliza solo el tema factual mas reciente,
-        # no confesiones ni mensajes personales sin relacion con la busqueda.
+        # Con una orden suelta como "busca", reutiliza el tema factual mas reciente.
+        # Solo acepta aclaraciones cortas (ano/edicion/fuente) para no mandar confesiones
+        # ni mensajes personales a un motor de busqueda externo.
         lookup_indexes = [i for i, prior in enumerate(user_items) if _CONTEXT_LOOKUP.search(prior)]
         if lookup_indexes:
             topic_start = lookup_indexes[-1]
-            query_parts = user_items[topic_start:][-4:]
+            query_parts = [user_items[topic_start]]
+            clarification_re = re.compile(
+                r"\\b(19\\d{2}|20\\d{2}|original|deluxe|remaster|remastered|"
+                r"edicion|edición|version|versión|album|vinilo|vinyl|cd|spotify|"
+                r"apple music|discogs|la de|el de)\\b",
+                re.IGNORECASE,
+            )
+            for prior in user_items[topic_start + 1:]:
+                if len(prior) <= 60 and clarification_re.search(prior):
+                    query_parts.append(prior)
+                elif _CONTEXT_LOOKUP.search(prior):
+                    query_parts = [prior]
+                else:
+                    break
         else:
             query_parts = []
         if tail_key in {"en spotify", "en apple music", "en discogs"} and query_parts:
