@@ -29,7 +29,7 @@ class Entretenimiento(commands.Cog):
         ]
         await interaction.response.send_message(random.choice(chistes))
 
-    @app_commands.command(name="8ball", description="La bola 8 responderá a tu pregunta")
+    @app_commands.command(name="bola8_clasica", description="La bola 8 responderá a tu pregunta")
     async def ball8(self, interaction: discord.Interaction, pregunta: str):
         respuestas = [
             "Sí, totalmente papu :v",
@@ -41,17 +41,17 @@ class Entretenimiento(commands.Cog):
         ]
         await interaction.response.send_message(f"🎱 **Pregunta:** {pregunta}\n**Respuesta:** {random.choice(respuestas)}")
 
-    @app_commands.command(name="dado", description="Tira un dado de 6 caras")
+    @app_commands.command(name="dado_clasico", description="Tira un dado de 6 caras")
     async def dado(self, interaction: discord.Interaction):
         res = random.randint(1, 6)
         await interaction.response.send_message(f"🎲 Te salió un: **{res}** papu :v")
 
-    @app_commands.command(name="moneda", description="Lanza una moneda al aire (cara o cruz)")
+    @app_commands.command(name="moneda_clasica", description="Lanza una moneda al aire (cara o cruz)")
     async def moneda(self, interaction: discord.Interaction):
         res = random.choice(["Cara 🪙", "Cruz 🪙"])
         await interaction.response.send_message(f"🪙 Cayó en: **{res}** papu :v")
 
-    @app_commands.command(name="ppt", description="Juega piedra, papel o tijera contra el bot")
+    @app_commands.command(name="ppt_clasico", description="Juega piedra, papel o tijera contra el bot")
     @app_commands.choices(eleccion=[
         app_commands.Choice(name="piedra", value="piedra"),
         app_commands.Choice(name="papel", value="papel"),
@@ -89,7 +89,7 @@ class Entretenimiento(commands.Cog):
         embed.set_image(url=usuario.avatar.url if usuario.avatar else usuario.default_avatar.url)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="serverinfo", description="Muestra la información oficial del servidor")
+    @app_commands.command(name="serverinfo_clasico", description="Muestra la información oficial del servidor")
     async def serverinfo(self, interaction: discord.Interaction):
         guild = interaction.guild
         embed = discord.Embed(title=f"Información de {guild.name} :v", color=discord.Color.green())
