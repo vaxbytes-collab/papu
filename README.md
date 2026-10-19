@@ -70,7 +70,7 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 
 ## Persistencia
 
-Los JSON se guardan en `PAPU_DATA_DIR`. Para hosting efimero, monta un disco persistente o los recordatorios, configuracion, sugerencias, eventos y mascotas se perderan al reiniciar. Los ficheros JSON son adecuados para una instancia pequeña; para multiples procesos o alto volumen, migra a SQLite/PostgreSQL y añade transacciones.
+Los JSON se guardan en `PAPU_DATA_DIR` (por defecto, la raiz del proyecto para conservar compatibilidad con la configuracion de moderacion existente). Para hosting efimero, monta un disco persistente o los recordatorios, configuracion, sugerencias, eventos y mascotas se perderan al reiniciar. Los ficheros JSON son adecuados para una instancia pequeña; para multiples procesos o alto volumen, migra a SQLite/PostgreSQL y añade transacciones.
 
 ## Seguridad, permisos y privacidad
 
