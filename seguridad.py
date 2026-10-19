@@ -37,7 +37,7 @@ SUSPICIOUS_DOMAINS = {
 def contains_suspicious_link(content: str) -> bool:
     """Detecta dominios conocidos de rastreo/phishing sin bloquear cualquier URL."""
     for match in URL_RE.finditer(content or ""):
-        candidate = match.group(0).rstrip(".,!?;:)]}>\\"'")
+        candidate = match.group(0).rstrip(".,!?;:)]}>")
         if not candidate:
             continue
         parsed = urlparse(candidate if "://" in candidate else f"https://{candidate}")
