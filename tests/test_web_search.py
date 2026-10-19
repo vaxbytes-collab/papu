@@ -39,6 +39,18 @@ class WebSearchTests(unittest.TestCase):
         self.assertIn("2018", query)
         self.assertIn("kanye west", query.lower())
 
+    def test_life_of_pablo_tracklist_is_enriched_with_artist(self):
+        query = build_search_query("busca the life of pablo tracklist")
+        self.assertIn("kanye west", query.lower())
+
+    def test_bare_search_does_not_forward_private_chat_without_factual_topic(self):
+        history = [
+            {"role": "user", "content": "me siento raro hoy"},
+            {"role": "assistant", "content": "quieres contarme mas?"},
+            {"role": "user", "content": "ando preocupado"},
+        ]
+        self.assertEqual(build_search_query("busca", history), "")
+
     def test_search_filters_invalid_and_duplicate_urls(self):
         fake_results = [
             {"title": "Official Album", "href": "https://music.example/Album", "body": "Seven songs."},
