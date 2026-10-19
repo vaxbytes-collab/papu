@@ -290,21 +290,44 @@ class Moderacion(commands.Cog):
     @app_commands.checks.has_permissions(administrator=True)
     async def aimoderacion(self, interaction: discord.Interaction, activar: bool):
         key = self.guild_key(interaction.guild)
-        self.settings.setdefault(key, {})["ai_enabled"] = activar
+        config = self.settings.setdefault(key, {})
+        config["ai_enabled"] = activar
+        # Modo en vivo: solo casos graves y de confianza muy alta reciben acciones.
+        config["ai_live_actions"] = activar
+        config["ai_dry_run"] = False
         save_json(SETTINGS_FILE, self.settings)
-        state = "activadas" if activar else "desactivadas"
-        extra = ""
+        state = "activada en vivo" if activar else "desactivada"
+        extras = []
         if activar and not getattr(self.bot, "groq_client", None):
-            extra = " Falta GROQ_API_KEY; configura la variable para habilitar el analisis."
+            extras.append("Falta GROQ_API_KEY; sin ella no se analizaran mensajes.")
+        if activar:
+            permissions = interaction.guild.me.guild_permissions if interaction.guild.me else None
+            missing = []
+            if not permissions or not permissions.manage_messages:
+                missing.append("Gestionar mensajes")
+            if not permissions or not permissions.moderate_members:
+                missing.append("Moderar miembros")
+            if missing:
+                extras.append("A Papu le faltan permisos para algunas acciones: " + ", ".join(missing) + ".")
+            if not self.log_channels.get(key):
+                extras.append("Configura /setlogchannel para que los casos lleguen al staff.")
         await interaction.response.send_message(
-            f"alertas de IA {state}. La IA solo avisa al staff; no sanciona automaticamente.{extra}",
+            f"moderacion IA {state}. Los casos de gravedad 3, confianza >=95% y categoria sexual/amenaza/odio/acoso pueden borrar el mensaje y aplicar timeout de 24 horas. "
+            "Los casos menos concluyentes solo se registran; no se expulsa ni banea automaticamente. "
+            + " ".join(extras),
             ephemeral=True,
         )
-        await self.log(interaction.guild, "⚙️ Configuracion de IA", f"Alertas de moderacion: {state}.")
-
+        await self.log(interaction.guild, "Configuracion de moderacion IA",
+            f"Alertas: {state}. Acciones en vivo: {'activadas' if activar else 'desactivadas'}.")
+        
     @commands.Cog.listener()
     async def on_message(self, message):
         if not message.guild or message.author.bot or not message.content.strip():
+            return
+        if isinstance(message.author, discord.Member) and (
+            message.author.guild_permissions.administrator
+            or message.author.guild_permissions.manage_messages
+        ):
             return
         settings = self.settings.get(self.guild_key(message.guild), {})
         if not settings.get("ai_enabled", False) or message.content.startswith("!"):
@@ -313,9 +336,13 @@ class Moderacion(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_delete(self, message):
+        # Los casos de IA ya tienen su propio registro estructurado, no duplicar el evento de borrado.
+        if message.id in self.ai_deleted_ids:
+            self.ai_deleted_ids.discard(message.id)
+            return
         if message.guild and not message.author.bot:
             await self.log(message.guild, "🗑️ Mensaje eliminado",
-                f"Autor: {message.author} ({message.author.id})\nCanal: {message.channel.mention}\n"
+                f"Autor: {message.author} ({message.author.id})\\nCanal: {message.channel.mention}\\n"
                 f"Contenido: {safe_text(message.content or '[contenido no disponible en cache]')}",
                 discord.Color.red())
 
@@ -347,19 +374,26 @@ class Moderacion(commands.Cog):
                 "no pude analizarlo. revisa GROQ_API_KEY y la disponibilidad de la IA.", ephemeral=True
             )
         label = "posible infraccion" if result["flag"] else "sin indicios claros"
-        embed = make_embed(
-            "🛡️ Revision asistida por IA",
-            f"Resultado: {label}\nCategoria: {result['category']}\n"
-            f"Confianza estimada: {result['confidence']:.0%}\nMotivo: {result['reason']}\n\n"
-            "La IA puede equivocarse; el staff debe revisar el contexto.",
-            discord.Color.orange() if result["flag"] else discord.Color.green(),
+        case_id = next_case_id(interaction.guild_id)
+        embed = make_case_embed(
+            case_id=case_id,
+            title="Revision manual de IA" if result["flag"] else "Revision manual: sin indicios claros",
+            username=str(interaction.user),
+            user_id=interaction.user.id,
+            channel_name=getattr(interaction.channel, "name", "canal desconocido"),
+            channel_id=getattr(interaction.channel, "id", None),
+            category=result["category"],
+            severity=result["severity"],
+            confidence=result["confidence"],
+            reason=result["reason"],
+            message_text=texto,
+            message_url=None,
+            status=f"REVISION MANUAL: {label}; no se aplico ninguna sancion desde /modcheck.",
+            color=discord.Color.orange() if result["flag"] else discord.Color.green(),
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
         if result["flag"]:
-            await self.log(interaction.guild, "🛡️ Revision manual de IA",
-                f"Staff: {interaction.user}\nResultado: {label}\nCategoria: {result['category']}\n"
-                f"Confianza: {result['confidence']:.0%}\nMotivo: {result['reason']}\nTexto: {safe_text(texto, 900)}",
-                discord.Color.orange())
+            await self.log_case(interaction.guild, embed)
 
     @app_commands.command(name="kick", description="Expulsa a un usuario")
     @app_commands.checks.has_permissions(kick_members=True)
