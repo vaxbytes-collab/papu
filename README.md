@@ -101,7 +101,7 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 
 ## Persistencia
 
-Papu usa **PostgreSQL externo** si existe la variable `DATABASE_URL`; si no, usa JSON local para desarrollo. Todos los módulos utilizan el mismo almacenamiento: michis, recordatorios, eventos, sugerencias, avisos de moderación y configuraciones por servidor. El esquema se crea automáticamente al arrancar.
+Papu usa **PostgreSQL externo** si existe la variable `DATABASE_URL`; si no, usa JSON local para desarrollo. Todos los módulos utilizan el mismo almacenamiento: michis, recordatorios, eventos, sugerencias, avisos de moderación, configuraciones por servidor y los últimos 13 mensajes de conversación por usuario y servidor. El esquema se crea automáticamente al arrancar.
 
 ### Conectar la base de datos en Render
 
@@ -119,6 +119,7 @@ La primera inicialización intenta importar los JSON que todavía existan en la 
 - Configura `/setlogchannel` hacia un canal privado para el staff. Los logs pueden contener mensajes eliminados/editados y datos sensibles.
 - El canal de respuesta automatica es opt-in por servidor y se configura con `/canal_chat`. Los mensajes de ese canal tambien pueden enviarse a Groq para generar respuestas.
 - Nunca pongas tokens o claves API en el repositorio. Si se filtran, revocalos y genera otros.
+- Con `DATABASE_URL`, el historial breve de chat tambien se guarda en PostgreSQL; informa a los miembros de ese almacenamiento y restringe el acceso a la base de datos.
 - Da al bot solo los permisos necesarios. Los comandos de moderacion tienen checks de permisos de Discord; el rol del bot debe estar por encima de los miembros a moderar.
 - Los minijuegos de caos son optativos y no deben usarse para acosar, saturar canales o pinguear a todo el servidor.
 
