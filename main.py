@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from flask import Flask
 from groq import Groq
 from groq_config import get_groq_model
-from chat_policy import PROMPT_SISTEMA, is_contextless_numeric_message
+from chat_policy import PROMPT_SISTEMA, deterministic_chat_reply
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -97,10 +97,10 @@ async def on_message(message):
                         user_key, [{"role": "system", "content": PROMPT_SISTEMA}]
                     )
                     had_prior_context = len(history) > 1
-                    clarify_without_ai = (
-                        not had_prior_context
-                        and not message.attachments
-                        and is_contextless_numeric_message(contenido)
+                    local_reply = deterministic_chat_reply(
+                        contenido,
+                        has_prior_context=had_prior_context,
+                        has_attachments=bool(message.attachments),
                     )
                     history.append({
                         "role": "user",
@@ -109,10 +109,9 @@ async def on_message(message):
                     answer = None
                     keep_turn = False
 
-                    if clarify_without_ai:
-                        # Una entrada como "1." no revela el idioma ni una intención.
-                        # Evita una llamada al modelo y responde de forma determinista en español.
-                        answer = f"solo me llegó un «{contenido[:80]}», papu 😅. ¿Qué querías decir? :v"
+                    if local_reply is not None:
+                        # Casos claros y breves se resuelven en español sin llamar al modelo.
+                        answer = local_reply
                         history.append({"role": "assistant", "content": answer})
                         HISTORIALES_USUARIOS[user_key] = [history[0]] + history[-MAX_HISTORIAL:]
                         keep_turn = True
