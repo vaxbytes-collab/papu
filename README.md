@@ -67,6 +67,7 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 - Los resultados proceden de la biblioteca `ddgs` y se pasan al modelo como datos externos no confiables; la respuesta debe enlazar las fuentes exactas y no inventar detalles.
 - Si no aparecen resultados, Papu explica que la busqueda fallo en vez de fabricar una respuesta.
 - La busqueda necesita acceso a internet desde el alojamiento. No requiere otra API key, pero los motores pueden aplicar limites o bloquear peticiones.
+- Los temas de busqueda se envian a proveedores externos. Cuando alguien escribe solo `busca`, Papu reutiliza unicamente el tema factual reciente y aclaraciones cortas (como año o edicion), no conversaciones personales sin relacion.
 - Si no hay clave de Groq pero la busqueda funciona, Papu muestra los resultados con enlaces directos.
 
 ## Comandos destacados
