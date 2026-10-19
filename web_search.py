@@ -128,17 +128,18 @@ def build_search_query(text: str, history: Iterable[dict] = ()) -> str:
 
 
 def search_web(query: str, max_results: int = 5) -> list[dict[str, str]]:
-    """Busca resultados web y devuelve solo titulo, URL y resumen."""
+    """Busca en Google primero, con Brave como respaldo, y devuelve titulo, URL y resumen."""
     query = _clean(query)[:280]
     if not query:
         return []
     max_results = max(1, min(int(max_results), 5))
     raw_results = DDGS(timeout=8).text(
         query,
-        region="wt-wt",
+        region="es-es",
         safesearch="moderate",
         max_results=max_results,
-        backend="auto",
+        # Google es el motor principal; Brave queda como respaldo si Google no responde.
+        backend="google, brave",
     )
     output: list[dict[str, str]] = []
     seen = set()
