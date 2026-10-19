@@ -18,12 +18,13 @@ _FACTUAL_LOOKUP = re.compile(
     r"ultimas novedades)\b",
     re.IGNORECASE,
 )
-_COMMAND_ONLY = {
-    "busca", "buscala", "buscalo", "buscalos", "buscalas", "buscame",
-    "buscame eso", "busca eso", "busca la", "busca la lista", "busca en internet",
-    "investiga", "averigua", "googlea", "hazlo", "porfa busca", "por favor busca",
-    "buscaaaaaaaa", "buscaloooooooo", "buscalaaaaaaaaa",
-}
+_CONTEXT_LOOKUP = re.compile(
+    r"\\b(track\\s*list|tracklist|lista de canciones|lista de temas|discografia|"
+    r"discografía|qu[eé] paso|qu[eé] ocurrio|cuando|d[oó]nde|qui[eé]n|"
+    r"fecha|precio|noticias|fuente oficial|album|\\bye\\b|kanye west|"
+    r"mercado|reabrio|reabrir|se estreno|lanzamiento|cu[aá]l es)\\b",
+    re.IGNORECASE,
+)
 _GENERIC_HISTORY = {
     "busca", "buscala", "buscalo", "buscame", "busca eso", "hazlo",
     "de 2018", "de 2019", "de 2020", "busca en internet",
@@ -87,7 +88,17 @@ def build_search_query(text: str, history: Iterable[dict] = ()) -> str:
             if len(prior) < 3:
                 continue
             user_items.append(prior)
-        query_parts = user_items[-4:] + ([tail] if tail_key in {"en spotify", "en apple music", "en discogs"} else [])
+
+        # Con una orden suelta como "busca", reutiliza solo el tema factual mas reciente,
+        # no confesiones ni mensajes personales sin relacion con la busqueda.
+        lookup_indexes = [i for i, prior in enumerate(user_items) if _CONTEXT_LOOKUP.search(prior)]
+        if lookup_indexes:
+            topic_start = lookup_indexes[-1]
+            query_parts = user_items[topic_start:][-4:]
+        else:
+            query_parts = []
+        if tail_key in {"en spotify", "en apple music", "en discogs"} and query_parts:
+            query_parts.append(tail)
 
     query = " ".join(query_parts).strip()
     if not query:
