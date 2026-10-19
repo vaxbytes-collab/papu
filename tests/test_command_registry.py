@@ -14,6 +14,35 @@ COG_FILES = (
 DISCORD_GLOBAL_CHAT_INPUT_COMMAND_LIMIT = 100
 
 
+def declared_group_commands():
+    commands = []
+    for filename in COG_FILES:
+        tree = ast.parse((ROOT / filename).read_text(encoding="utf-8"), filename=filename)
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for decorator in node.decorator_list:
+                if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):
+                    continue
+                if decorator.func.attr != "command":
+                    continue
+                owner = decorator.func.value
+                if not isinstance(owner, ast.Name) or owner.id not in {"guardia", "arcade"}:
+                    continue
+                name = next(
+                    (
+                        keyword.value.value
+                        for keyword in decorator.keywords
+                        if keyword.arg == "name"
+                        and isinstance(keyword.value, ast.Constant)
+                        and isinstance(keyword.value.value, str)
+                    ),
+                    node.name,
+                )
+                commands.append((name, filename))
+    return commands
+
+
 def declared_slash_commands():
     commands = []
     for filename in COG_FILES:
@@ -100,6 +129,7 @@ class CommandRegistryTests(unittest.TestCase):
             "lore_aleatorio",
             "traductor_michi",
         }
+        names.update(name for name, _ in declared_group_commands())
         self.assertTrue(expected.issubset(names), f"Missing commands: {sorted(expected - names)}")
 
 
