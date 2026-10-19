@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from threading import Thread
 
@@ -49,12 +50,12 @@ class PapuBot(commands.Bot):
                 await self.load_extension(module)
                 print(f"[OK] Modulo cargado: {module}")
             except Exception:
-                print(f"[ERROR] No se pudo cargar {module}", exc_info=True)
+                logging.exception("[ERROR] No se pudo cargar %s", module)
         try:
             synced = await self.tree.sync()
             print(f"[OK] Comandos slash sincronizados: {len(synced)}")
         except Exception:
-            print("[ERROR] No se pudieron sincronizar los comandos slash", exc_info=True)
+            logging.exception("[ERROR] No se pudieron sincronizar los comandos slash")
 
 bot = PapuBot()
 HISTORIALES_USUARIOS = {}
@@ -144,7 +145,7 @@ async def on_message(message):
                                             print("[WARN] La busqueda web agoto el tiempo de espera.")
                                             search_results = []
                                         except Exception:
-                                            print("[WARN] Fallo la busqueda web", exc_info=True)
+                                            logging.exception("[WARN] Fallo la busqueda web")
                                             search_results = []
 
                                     if not search_query:
@@ -192,7 +193,7 @@ async def on_message(message):
                             print("[WARN] Groq agoto el tiempo de espera al responder un mensaje.")
                         except Exception:
                             answer = normalize_papu_style("se me trabaron las patitas con la ia :'v intenta de nuevo en un rato.")
-                            print("[ERROR] Fallo la llamada a Groq", exc_info=True)
+                            logging.exception("[ERROR] Fallo la llamada a Groq")
                         finally:
                             # No dejes preguntas fallidas acumuladas en el historial.
                             if not keep_turn and history and history[-1].get("role") == "user":
@@ -206,9 +207,7 @@ async def on_message(message):
                         )
                     except discord.HTTPException:
                         print(
-                            "[ERROR] Groq terminó, pero Discord rechazó el mensaje. "
-                            "Comprueba View Channel y Send Messages en el canal.",
-                            exc_info=True,
+                            "[ERROR] Groq terminó, pero Discord rechazó el mensaje. Comprueba View Channel y Send Messages en el canal.",
                         )
     finally:
         await bot.process_commands(message)
