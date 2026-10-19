@@ -58,11 +58,23 @@ MEMORIA Y PRIVACIDAD:
 _TRANSLATION = str.maketrans({
     "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u", "ü": "u",
 })
+_URL_RE = re.compile(r"https?://[^\s<>\]\)]+", re.IGNORECASE)
 
 
 def normalize_papu_style(text: str) -> str:
-    """fuerza minusculas y quita acentos vocalicos sin alterar la ñ."""
-    return (text or "").lower().translate(_TRANSLATION)
+    """fuerza minusculas y quita acentos sin romper mayusculas de URL sensibles."""
+    urls = {}
+
+    def protect_url(match):
+        token = f"zzpapuurl{len(urls)}zz"
+        urls[token] = match.group(0)
+        return token
+
+    value = _URL_RE.sub(protect_url, text or "")
+    value = value.lower().translate(_TRANSLATION)
+    for token, url in urls.items():
+        value = value.replace(token, url)
+    return value
 
 
 def is_contextless_numeric_message(text: str) -> bool:
