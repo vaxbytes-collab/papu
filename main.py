@@ -13,6 +13,8 @@ from chat_policy import PROMPT_SISTEMA, deterministic_chat_reply, normalize_papu
 from web_search import build_search_query, format_search_context, format_search_reply, search_web, should_search_web
 
 load_dotenv()
+from papu_store import init_storage, load_json as load_store_json, save_json as save_store_json
+
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 # Evita esperas largas y reintentos ocultos cuando el proveedor no responde.
@@ -45,11 +47,31 @@ class PapuBot(commands.Bot):
 
     async def setup_hook(self):
         # Valida PostgreSQL antes de cargar cogs para no arrancar con estado vacio si la DB falla.
-        from papu_store import init_storage
-
         try:
             backend = init_storage()
             logging.info("[STORAGE] Backend activo: %s", backend)
+
+            # Recupera conversaciones recientes y actualiza el prompt de sistema a la version actual.
+            stored_histories = load_store_json("chat_histories.json", {})
+            if isinstance(stored_histories, dict):
+                for user_key, saved_messages in stored_histories.items():
+                    if not isinstance(user_key, str) or not isinstance(saved_messages, list):
+                        continue
+                    messages = [
+                        {"role": item["role"], "content": item["content"][:4000]}
+                        for item in saved_messages
+                        if isinstance(item, dict)
+                        and item.get("role") in {"user", "assistant"}
+                        and isinstance(item.get("content"), str)
+                    ]
+                    HISTORIALES_USUARIOS[user_key] = (
+                        [{"role": "system", "content": PROMPT_SISTEMA}]
+                        + messages[-MAX_HISTORIAL:]
+                    )
+                logging.info(
+                    "[STORAGE] Historiales de chat recuperados: %s",
+                    len(HISTORIALES_USUARIOS),
+                )
         except Exception as exc:
             logging.exception("[STORAGE] No se pudo inicializar el almacenamiento")
             raise RuntimeError(
@@ -74,6 +96,15 @@ bot = PapuBot()
 HISTORIALES_USUARIOS = {}
 BLOQUEOS_USUARIOS = {}
 MAX_HISTORIAL = 13
+
+
+def persist_user_histories():
+    """Guarda los historiales breves; no interrumpe la respuesta si la DB cae temporalmente."""
+    try:
+        save_store_json("chat_histories.json", HISTORIALES_USUARIOS)
+    except Exception:
+        logging.exception("[STORAGE] No se pudo persistir el historial de chat")
+
 
 @bot.event
 async def on_ready():
@@ -138,6 +169,7 @@ async def on_message(message):
                         answer = local_reply
                         history.append({"role": "assistant", "content": answer})
                         HISTORIALES_USUARIOS[user_key] = [history[0]] + history[-MAX_HISTORIAL:]
+                        persist_user_histories()
                         keep_turn = True
                     else:
                         search_requested = should_search_web(contenido)
@@ -200,6 +232,7 @@ async def on_message(message):
 
                             history.append({"role": "assistant", "content": answer})
                             HISTORIALES_USUARIOS[user_key] = [history[0]] + history[-MAX_HISTORIAL:]
+                            persist_user_histories()
                             keep_turn = True
                         except asyncio.TimeoutError:
                             answer = normalize_papu_style("la ia se quedo pensando demasiado, compa 😿. intentalo otra vez en unos segundos :v")
