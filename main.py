@@ -97,10 +97,19 @@ async def on_message(message):
                         user_key, [{"role": "system", "content": PROMPT_SISTEMA}]
                     )
                     had_prior_context = len(history) > 1
+                    last_assistant_message = next(
+                        (
+                            item.get("content", "")
+                            for item in reversed(history)
+                            if item.get("role") == "assistant"
+                        ),
+                        "",
+                    )
                     local_reply = deterministic_chat_reply(
                         contenido,
                         has_prior_context=had_prior_context,
                         has_attachments=bool(message.attachments),
+                        last_assistant_message=last_assistant_message,
                     )
                     history.append({
                         "role": "user",
