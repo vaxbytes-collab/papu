@@ -6,7 +6,7 @@ Bot modular de Discord para PapuCollective: moderacion segura, comunidad, organi
 
 - `main.py`: inicio, Groq chat y sincronizacion global de comandos slash.
 - `moderacion.py`: logs, moderacion, sanciones manuales, advertencias y alertas de IA.
-- `seguridad.py`: anti-spam, alertas anti-raid y filtro optativo de invitaciones.
+- `seguridad.py`: protecciones configurables, filtros de mensajes, alertas de raid, reportes privados y auditoria de permisos.
 - `utilidades.py`: recordatorios, encuestas, eventos, sugerencias, sorteos e informacion del servidor.
 - `juegos.py`: minijuegos y mascota virtual con monedas, comida, energia y felicidad.
 - `musica.py`: cola y reproduccion por voz con controles slash.
@@ -91,20 +91,30 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 - `/setlogchannel`, `/logconfig`: registros del servidor.
 - `/aimoderacion activar`, `/modcheck texto`: alertas de IA y revision manual.
 - `/canal_chat [canal]`: canal optativo donde Papu responde sin mencion; omitir el canal desactiva esa funcion.
-- `/warn`, `/warns`, `/unwarn`, `/clearwarns`, `/diagnostico`, `/kick`, `/ban`, `/unban`, `/timeout`, `/untimeout`, `/purge`, `/slowmode`, `/lock`, `/unlock`.
+- `/warn`, `/warns`, `/unwarn`, `/clearwarns`, `/diagnostico`, `/kick`, `/ban`, `/unban`, `/timeout`, `/untimeout`, `/timeout_estado`, `/purge`, `/purge_usuario`, `/purge_bots`, `/slowmode`, `/lock`, `/unlock`, `/apodo`, `/rol_dar`, `/rol_quitar`.
 - `/userinfo`, `/serverinfo`, `/ping`.
 
 ### Protecciones automaticas (opt-in)
 - `/antispam activar limite ventana timeout_segundos`: borra el mensaje que dispara el limite y aplica timeout configurable. Desactivado por defecto.
 - `/antiraid activar umbral ventana`: alerta al canal de logs ante picos de entradas; no banea ni expulsa automaticamente.
 - `/antienlaces activar`: bloquea invitaciones de Discord y una lista limitada de dominios conocidos de phishing/rastreo; no bloquea enlaces normales por defecto.
-- `/seguridad_estado`: revisa la configuracion actual. Usa `/setlogchannel` para recibir alertas.
+- `/antimenciones activar maximo`: elimina mensajes que superen el limite de menciones.
+- `/antirepeticion activar repeticiones ventana`: detecta mensajes repetidos.
+- `/filtro_caps activar porcentaje minimo_letras`: filtra mensajes largos con demasiadas mayusculas.
+- `/palabra_bloquear palabra`, `/palabra_permitir palabra`, `/palabras_bloqueadas`: gestiona el filtro de palabras/frases por servidor.
+- `/canal_reportes canal`, `/reportar usuario motivo`: configura reportes privados para que los revise el staff.
+- `/auditoria_permisos`: avisa si @everyone tiene permisos delicados y revisa permisos comunes que le falten al bot.
+- `/seguridad_estado`: revisa el estado de todas las protecciones. Usa `/setlogchannel` para recibir alertas.
 
-### Minijuegos y mascota
+### Entretenimiento, minijuegos y mascota
 - `/ppt`, `/dado`, `/moneda`, `/8ball`, `/trivia`, `/caos`.
-- `/dilema`: dilemas divertidos y sanos. `/frase_michi`: frases aleatorias del michi.
+- `/dilema`, `/adivinanza`, `/dado_personalizado caras`, `/fortuna`: dilemas, acertijos, dados configurables y fortunas de broma.
+- `/nombre_banda`, `/nombre_usuario estilo`, `/pov tema`, `/superpoder`, `/villano`: generadores de nombres, memes y personajes absurdos.
+- `/dato_michi`, `/reto_sano`, `/mood_michi`, `/palabra_aleatoria`: curiosidades gatunas, retos seguros y palabras aleatorias.
+- `/duelo_aleatorio`, `/completa_frase`, `/verso_michi`, `/npc`, `/excusa_gamer`: humor y generadores de frases.
+- `/cancion_inventada`, `/lore_aleatorio`, `/traductor_michi`, `/frase_michi`: títulos de canciones ficticias, lore y lenguaje michi.
 - `/michi_adoptar [nombre]`, `/michi`, `/michi_cuidar`, `/michi_comida`, `/michi_jugar`.
-- Los comandos heredados de entretenimiento usan `/ppt_clasico`, `/dado_clasico`, `/moneda_clasica`, `/bola8_clasica` y `/serverinfo_clasico` para no duplicar nombres.
+- Los comandos heredados de entretenimiento usan `/ppt_clasico`, `/dado_clasico`, `/moneda_clasica` y `/bola8_clasica` para no duplicar nombres.
 
 ### Musica
 - `/play consulta`, `/cola`, `/pause`, `/resume`, `/skip`, `/stop`.
