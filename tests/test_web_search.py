@@ -61,16 +61,36 @@ class WebSearchTests(unittest.TestCase):
         with patch("web_search.DDGS") as ddgs_class:
             ddgs_class.return_value.text.return_value = fake_results
             results = search_web("Ye tracklist")
+            ddgs_class.assert_called_once_with(timeout=2.5)
             ddgs_class.return_value.text.assert_called_once_with(
                 "Ye tracklist",
                 region="es-es",
                 safesearch="moderate",
                 max_results=5,
-                backend="google, brave",
+                backend="google",
             )
         self.assertEqual(len(results), 2)
         self.assertEqual(results[0]["url"], "https://music.example/Album")
         self.assertTrue(all(x["url"].startswith("https://") for x in results))
+
+    def test_google_failure_falls_back_to_brave(self):
+        brave_results = [
+            {"title": "Backup result", "href": "https://brave.example/search", "body": "Found through fallback."}
+        ]
+        with patch("web_search.DDGS") as ddgs_class:
+            ddgs_class.return_value.text.side_effect = [RuntimeError("Google blocked"), brave_results]
+            results = search_web("papu search test")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["title"], "Backup result")
+        calls = ddgs_class.return_value.text.call_args_list
+        self.assertEqual(calls[0].kwargs["backend"], "google")
+        self.assertEqual(calls[1].kwargs["backend"], "brave")
+
+    def test_search_returns_empty_instead_of_raising_when_all_engines_fail(self):
+        with patch("web_search.DDGS") as ddgs_class:
+            ddgs_class.return_value.text.side_effect = RuntimeError("search unavailable")
+            self.assertEqual(search_web("papu search test"), [])
+        self.assertEqual(ddgs_class.return_value.text.call_count, 4)
 
     def test_search_context_includes_source_urls_and_safety_instructions(self):
         context = format_search_context("Ye tracklist", [
