@@ -2,7 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import papu_store
 
@@ -61,6 +61,36 @@ class PapuStoreTests(unittest.TestCase):
         papu_store.save_json("state.json", value)
         self.assertEqual(papu_store.load_json("state.json", {}), value)
 
+    def test_postgres_load_reads_jsonb_value(self):
+        expected = {"guild": {"michi": "Bigotes 🐈", "coins": 12}}
+        with patch.dict("os.environ", {"DATABASE_URL": "postgresql://papu:test@db.example/papu"}):
+            with patch("papu_store.psycopg.connect") as connect:
+                connection = connect.return_value.__enter__.return_value
+                connection.execute.return_value.fetchone.return_value = (expected,)
+                actual = papu_store.load_json("pets.json", {})
+        self.assertEqual(actual, expected)
+        connect.assert_called_once_with(
+            "postgresql://papu:test@db.example/papu", connect_timeout=8
+        )
+        self.assertIn("SELECT value FROM papu_json_store", connection.execute.call_args.args[0])
+
+    def test_postgres_save_upserts_jsonb_value(self):
+        value = {"michi": "Bigotes 🐈", "coins": 12}
+        with patch.dict("os.environ", {"DATABASE_URL": "postgresql://papu:test@db.example/papu"}):
+            with patch("papu_store.psycopg.connect") as connect:
+                connection = connect.return_value.__enter__.return_value
+                papu_store.save_json("pets.json", value)
+        statement, params = connection.execute.call_args.args
+        self.assertIn("ON CONFLICT (key) DO UPDATE", statement)
+        self.assertEqual(params[0], "pets.json")
+        self.assertIsInstance(params[1], papu_store.Jsonb)
+
+    def test_database_error_does_not_silently_fallback_to_local_json(self):
+        with patch.dict("os.environ", {"DATABASE_URL": "postgresql://papu:test@db.example/papu"}):
+            with patch("papu_store.psycopg.connect", side_effect=RuntimeError("database down")):
+                with self.assertRaises(RuntimeError):
+                    papu_store.load_json("pets.json", {})
+
     def test_missing_or_invalid_file_returns_default(self):
         self.assertEqual(papu_store.load_json("missing.json", []), [])
         papu_store.data_path("broken.json").write_text("{oops", encoding="utf-8")
@@ -98,6 +128,19 @@ class PapuStoreTests(unittest.TestCase):
             copied = papu_store._migrate_legacy_data([legacy])
         self.assertEqual(copied, 0)
         self.assertFalse((destination / "pets.json").exists())
+
+    def test_postgres_import_uses_do_nothing_to_preserve_existing_database_rows(self):
+        legacy = Path(self.temp.name) / "legacy"
+        legacy.mkdir()
+        (legacy / "pets.json").write_text('{"123": {"name": "bigotes"}}', encoding="utf-8")
+        connection = MagicMock()
+        connection.execute.return_value.fetchone.return_value = None
+        imported = papu_store._migrate_legacy_data_to_postgres(connection, [legacy])
+        self.assertEqual(imported, 0)
+        statement, params = connection.execute.call_args.args
+        self.assertIn("ON CONFLICT (key) DO NOTHING", statement)
+        self.assertEqual(params[0], "pets.json")
+        self.assertIsInstance(params[1], papu_store.Jsonb)
 
 
 if __name__ == "__main__":
