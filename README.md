@@ -10,7 +10,7 @@ Bot modular de Discord para PapuCollective: moderacion segura, comunidad, organi
 - `utilidades.py`: recordatorios, encuestas, eventos, sugerencias, sorteos e informacion del servidor.
 - `juegos.py`: minijuegos y mascota virtual con monedas, comida, energia y felicidad.
 - `musica.py`: cola y reproduccion por voz con controles slash.
-- `papu_store.py`: persistencia JSON con escritura atomica.
+- `papu_store.py`: almacenamiento PostgreSQL con respaldo local JSON y migracion segura.
 - `tests/`: pruebas unitarias del almacenamiento.
 
 ## Requisitos y ejecucion
@@ -97,7 +97,7 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 ### Protecciones automaticas (opt-in)
 - `/antispam activar limite ventana timeout_segundos`: borra el mensaje que dispara el limite y aplica timeout configurable. Desactivado por defecto.
 - `/antiraid activar umbral ventana`: alerta al canal de logs ante picos de entradas; no banea ni expulsa automaticamente.
-- `/antienlaces activar`: bloquea invitaciones de Discord, sin tocar enlaces normales.
+- `/antienlaces activar`: bloquea invitaciones de Discord y una lista limitada de dominios conocidos de phishing/rastreo; no bloquea enlaces normales por defecto.
 - `/seguridad_estado`: revisa la configuracion actual. Usa `/setlogchannel` para recibir alertas.
 
 ### Minijuegos y mascota
@@ -141,4 +141,4 @@ La primera inicialización intenta importar los JSON que todavía existan en la 
 python -m unittest discover -s tests -v
 ```
 
-El workflow de GitHub Actions ejecuta estas pruebas en cada push y pull request. Las pruebas unitarias cubren la persistencia local; todavia hace falta probar interacciones reales en un servidor privado de Discord antes de un despliegue de produccion.
+El workflow de GitHub Actions ejecuta estas pruebas en cada push y pull request, incluyendo almacenamiento PostgreSQL simulado, migracion JSON y deteccion de enlaces. Todavia hace falta probar interacciones reales y permisos en un servidor privado antes de un despliegue de produccion.
