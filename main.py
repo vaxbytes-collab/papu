@@ -7,6 +7,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from flask import Flask
 from groq import Groq
+from groq_config import get_groq_model
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -112,7 +113,7 @@ async def on_message(message):
                             response = await asyncio.wait_for(
                                 asyncio.to_thread(
                                     bot.groq_client.chat.completions.create,
-                                    model=os.getenv("GROQ_CHAT_MODEL", "llama-3.1-8b-instant"),
+                                    model=get_groq_model("GROQ_CHAT_MODEL"),
                                     messages=[dict(item) for item in history],
                                     temperature=0.7,
                                     max_tokens=700,
