@@ -54,7 +54,7 @@ class Moderacion(commands.Cog):
         self.log_channels = load_json(LOGS_FILE, {})
         self.settings = load_json(SETTINGS_FILE, {})
         self.ai_semaphore = asyncio.Semaphore(AI_MAX_CONCURRENT_CHECKS)
-        self.ai_deleted_ids = set()
+        self.case_deleted_ids = set()
 
     def guild_key(self, guild):
         return str(guild.id)
@@ -172,11 +172,11 @@ class Moderacion(commands.Cog):
             attempted_action = True
             member = message.author if isinstance(message.author, discord.Member) else None
             try:
-                self.ai_deleted_ids.add(message.id)
+                self.case_deleted_ids.add(message.id)
                 await message.delete(reason=f"Papu IA caso #{case_id}: {category}, gravedad {severity}, confianza {confidence:.0%}")
                 actions.append("mensaje eliminado")
             except (discord.Forbidden, discord.HTTPException):
-                self.ai_deleted_ids.discard(message.id)
+                self.case_deleted_ids.discard(message.id)
                 actions.append("no se pudo borrar el mensaje (revisar permiso Gestionar mensajes)")
 
             if member is None:
@@ -359,8 +359,8 @@ class Moderacion(commands.Cog):
     @commands.Cog.listener()
     async def on_message_delete(self, message):
         # Los casos de IA ya tienen su propio registro estructurado, no duplicar el evento de borrado.
-        if message.id in self.ai_deleted_ids:
-            self.ai_deleted_ids.discard(message.id)
+        if message.id in self.case_deleted_ids:
+            self.case_deleted_ids.discard(message.id)
             return
         if message.guild and not message.author.bot:
             await self.log(message.guild, "🗑️ Mensaje eliminado",
