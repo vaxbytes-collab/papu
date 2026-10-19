@@ -5,7 +5,8 @@ Bot modular de Discord para PapuCollective: moderacion segura, comunidad, organi
 ## Modulos
 
 - `main.py`: inicio, Groq chat y sincronizacion global de comandos slash.
-- `moderacion.py`: logs, moderacion, advertencias y alertas de IA.
+- `moderacion.py`: logs, moderacion, sanciones manuales, advertencias y alertas de IA.
+- `seguridad.py`: anti-spam, alertas anti-raid y filtro optativo de invitaciones.
 - `utilidades.py`: recordatorios, encuestas, eventos, sugerencias, sorteos e informacion del servidor.
 - `juegos.py`: minijuegos y mascota virtual con monedas, comida, energia y felicidad.
 - `musica.py`: cola y reproduccion por voz con controles slash.
@@ -83,6 +84,8 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 - `/sugerencia texto`: publica una propuesta.
 - `/sorteo participantes`: sorteo entre menciones; requiere permiso de gestion del servidor.
 - `/config_papu`: muestra configuracion comunitaria.
+- `/afk [motivo]`: estado AFK persistente; avisa al mencionar a alguien ausente y lo limpia al volver.
+- `/rolinfo rol`: detalles de un rol. `/timestamp unix`: convierte un Unix timestamp a formatos de Discord.
 
 ### Administracion y moderacion
 - `/setlogchannel`, `/logconfig`: registros del servidor.
@@ -91,9 +94,17 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 - `/warn`, `/warns`, `/unwarn`, `/clearwarns`, `/diagnostico`, `/kick`, `/ban`, `/unban`, `/timeout`, `/untimeout`, `/purge`, `/slowmode`, `/lock`, `/unlock`.
 - `/userinfo`, `/serverinfo`, `/ping`.
 
+### Protecciones automaticas (opt-in)
+- `/antispam activar limite ventana timeout_segundos`: borra el mensaje que dispara el limite y aplica timeout configurable. Desactivado por defecto.
+- `/antiraid activar umbral ventana`: alerta al canal de logs ante picos de entradas; no banea ni expulsa automaticamente.
+- `/antienlaces activar`: bloquea invitaciones de Discord, sin tocar enlaces normales.
+- `/seguridad_estado`: revisa la configuracion actual. Usa `/setlogchannel` para recibir alertas.
+
 ### Minijuegos y mascota
 - `/ppt`, `/dado`, `/moneda`, `/8ball`, `/trivia`, `/caos`.
-- `/michi_adoptar [nombre]`, `/michi`, `/michi_cuidar`, `/michi_comida`, `/michi_jugar`.\n- Los comandos heredados de entretenimiento usan `/ppt_clasico`, `/dado_clasico`, `/moneda_clasica`, `/bola8_clasica` y `/serverinfo_clasico` para no duplicar nombres.
+- `/dilema`: dilemas divertidos y sanos. `/frase_michi`: frases aleatorias del michi.
+- `/michi_adoptar [nombre]`, `/michi`, `/michi_cuidar`, `/michi_comida`, `/michi_jugar`.
+- Los comandos heredados de entretenimiento usan `/ppt_clasico`, `/dado_clasico`, `/moneda_clasica`, `/bola8_clasica` y `/serverinfo_clasico` para no duplicar nombres.
 
 ### Musica
 - `/play consulta`, `/cola`, `/pause`, `/resume`, `/skip`, `/stop`.
@@ -121,6 +132,7 @@ La primera inicialización intenta importar los JSON que todavía existan en la 
 - Nunca pongas tokens o claves API en el repositorio. Si se filtran, revocalos y genera otros.
 - Con `DATABASE_URL`, el historial breve de chat tambien se guarda en PostgreSQL; informa a los miembros de ese almacenamiento y restringe el acceso a la base de datos.
 - Da al bot solo los permisos necesarios. Los comandos de moderacion tienen checks de permisos de Discord; el rol del bot debe estar por encima de los miembros a moderar.
+- Las protecciones anti-spam, anti-raid y anti-invitaciones empiezan desactivadas y requieren que un administrador las active. Anti-raid solo alerta; no expulsa ni banea automaticamente.
 - Los minijuegos de caos son optativos y no deben usarse para acosar, saturar canales o pinguear a todo el servidor.
 
 ## Pruebas
