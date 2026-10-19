@@ -100,6 +100,12 @@ class ChatPolicyTests(unittest.TestCase):
         self.assertEqual(normalize_papu_style("¡HOLA, PAPÚ! ¿CÓMO ESTÁS?"), "¡hola, papu! ¿como estas?")
         self.assertEqual(normalize_papu_style("aquí está Ñoño"), "aqui esta ñoño")
 
+    def test_output_normalizer_preserves_case_sensitive_urls(self):
+        self.assertEqual(
+            normalize_papu_style("mira https://example.com/MiAlbum/TrackA"),
+            "mira https://example.com/MiAlbum/TrackA",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
