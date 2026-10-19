@@ -23,6 +23,7 @@ PERSISTED_JSON_FILES = (
     "afk.json",
     "staff_notes.json",
     "security_incidents.json",
+    "moderation_case_counters.json",
 )
 _LOCK = RLock()
 
