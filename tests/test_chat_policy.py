@@ -41,7 +41,7 @@ class ChatPolicyTests(unittest.TestCase):
         self.assertTrue(is_dryness_complaint(message))
         answer = deterministic_chat_reply(message, has_prior_context=True)
         self.assertIsNotNone(answer)
-        self.assertIn("JAJA perdon, compa", answer)
+        self.assertIn("jaja perdon, compa", answer)
         self.assertIn("cotorrear tambien", answer)
         self.assertEqual(answer, normalize_papu_style(answer))
 
