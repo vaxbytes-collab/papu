@@ -110,6 +110,17 @@ class Seguridad(commands.Cog):
         ventana: app_commands.Range[int, 3, 30] = 8,
         timeout_segundos: app_commands.Range[int, 0, 600] = 60,
     ):
+        permissions = interaction.guild.me.guild_permissions
+        if activar and not permissions.manage_messages:
+            return await interaction.response.send_message(
+                "necesito el permiso gestionar mensajes para borrar el spam. no cambie la configuracion.",
+                ephemeral=True,
+            )
+        if activar and timeout_segundos and not permissions.moderate_members:
+            return await interaction.response.send_message(
+                "necesito el permiso moderar miembros para aplicar timeout. usa timeout_segundos=0 o concedeme ese permiso.",
+                ephemeral=True,
+            )
         cfg = self.guild_config(interaction.guild_id)
         cfg["anti_spam"] = {
             "enabled": activar,
@@ -149,8 +160,8 @@ class Seguridad(commands.Cog):
         if activar:
             description = (
                 f"anti-raid **activado**: avisare al canal de logs si entran "
-                f"{umbral} miembros en {ventana} s. esta proteccion alerta al staff; "
-                "no banea ni expulsa automaticamente."
+                f"{umbral} miembros en {ventana} s. esta proteccion avisa en el canal de logs; "
+                "configura /setlogchannel para recibir la alerta. no banea ni expulsa automaticamente."
             )
         else:
             description = "anti-raid **desactivado**."
@@ -161,6 +172,12 @@ class Seguridad(commands.Cog):
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(administrator=True)
     async def antienlaces(self, interaction: discord.Interaction, activar: bool):
+        permissions = interaction.guild.me.guild_permissions
+        if activar and not permissions.manage_messages:
+            return await interaction.response.send_message(
+                "necesito el permiso gestionar mensajes para retirar enlaces no permitidos. no cambie la configuracion.",
+                ephemeral=True,
+            )
         cfg = self.guild_config(interaction.guild_id)
         cfg["anti_invites"] = {"enabled": activar}
         self.save_settings()
