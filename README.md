@@ -60,6 +60,15 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 - La memoria conversacional se limita al contexto por usuario y servidor que el bot tiene disponible; no debe inventar recuerdos ni revelar mensajes de otros miembros.
 - El chat tiene un tiempo de espera para que los fallos del proveedor no dejen la conversacion esperando indefinidamente.
 
+## Busqueda web desde el chat
+
+- Papu busca automaticamente cuando le preguntan por tracklists/listas de canciones y otras consultas factuales conocidas, y cuando alguien escribe comandos como `busca`, `buscala`, `investiga` o `averigua`.
+- Si el comando es solo `busca`, usa los mensajes previos del usuario para reconstruir el tema.
+- Los resultados proceden de la biblioteca `ddgs` y se pasan al modelo como datos externos no confiables; la respuesta debe enlazar las fuentes exactas y no inventar detalles.
+- Si no aparecen resultados, Papu explica que la busqueda fallo en vez de fabricar una respuesta.
+- La busqueda necesita acceso a internet desde el alojamiento. No requiere otra API key, pero los motores pueden aplicar limites o bloquear peticiones.
+- Si no hay clave de Groq pero la busqueda funciona, Papu muestra los resultados con enlaces directos.
+
 ## Comandos destacados
 
 ### Organizacion y comunidad
