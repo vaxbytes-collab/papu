@@ -488,7 +488,7 @@ class Seguridad(commands.Cog):
         if repeat_cfg.get("enabled") and message.content.strip():
             window_repeat = max(3, min(int(repeat_cfg.get("window", 12)), 60))
             repeat_limit = max(2, min(int(repeat_cfg.get("repeats", 3)), 6))
-            repeat_key = (message.guild.id, member.id)
+            repeat_key = (message.guild.id, message.channel.id, member.id)
             recent = self.recent_texts[repeat_key]
             now_repeat = time.monotonic()
             cutoff_repeat = now_repeat - window_repeat
@@ -514,7 +514,7 @@ class Seguridad(commands.Cog):
         limit = max(3, min(int(spam_cfg.get("limit", 6)), 20))
         timeout_seconds = max(0, min(int(spam_cfg.get("timeout", 60)), 600))
         now = time.monotonic()
-        key = (message.guild.id, member.id)
+        key = (message.guild.id, message.channel.id, member.id)
         events = self.message_times[key]
         events.append(now)
         count_recent_events(events, now, window)
