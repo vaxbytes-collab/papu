@@ -62,7 +62,6 @@ def make_case_content(
     else:
         heading = f"**{clean_title}**"
 
-    display = _clean(username, 80, True) if username else "usuario"
     user_line = f"**<@{int(user_id)}>** (`{int(user_id)}`)"
     channel_line = f"<#{int(channel_id)}>" if channel_id else f"**{_clean(channel_name, 120, True)}**"
     if message_url and re.fullmatch(r"https://(?:(?:ptb|canary)\.)?discord\.com/channels/\d+/\d+/\d+", message_url):
