@@ -48,7 +48,8 @@ class Seguridad(commands.Cog):
 
     async def security_log(self, guild: discord.Guild, text: str):
         """Usa el canal de logs configurado, sin publicar alertas en canales generales."""
-        raw_channel_id = self.log_channels.get(str(guild.id))
+        current_channels = load_json("log_channels.json", {})
+        raw_channel_id = current_channels.get(str(guild.id))
         if not raw_channel_id:
             return
         try:
