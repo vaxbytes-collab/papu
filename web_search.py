@@ -97,9 +97,9 @@ def build_search_query(text: str, history: Iterable[dict] = ()) -> str:
             topic_start = lookup_indexes[-1]
             query_parts = [user_items[topic_start]]
             clarification_re = re.compile(
-                r"\\b(19\\d{2}|20\\d{2}|original|deluxe|remaster|remastered|"
+                r"\b(19\d{2}|20\d{2}|original|deluxe|remaster|remastered|"
                 r"edicion|edición|version|versión|album|vinilo|vinyl|cd|spotify|"
-                r"apple music|discogs|la de|el de)\\b",
+                r"apple music|discogs|la de|el de)\b",
                 re.IGNORECASE,
             )
             for prior in user_items[topic_start + 1:]:
