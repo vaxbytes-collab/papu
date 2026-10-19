@@ -44,6 +44,19 @@ class PapuBot(commands.Bot):
         self.groq_client = groq_client
 
     async def setup_hook(self):
+        # Valida PostgreSQL antes de cargar cogs para no arrancar con estado vacio si la DB falla.
+        from papu_store import init_storage
+
+        try:
+            backend = init_storage()
+            logging.info("[STORAGE] Backend activo: %s", backend)
+        except Exception as exc:
+            logging.exception("[STORAGE] No se pudo inicializar el almacenamiento")
+            raise RuntimeError(
+                "Papu no puede iniciar sin acceso a su almacenamiento configurado. "
+                "Comprueba DATABASE_URL y la disponibilidad de PostgreSQL."
+            ) from exc
+
         # Los cogs estan en la raiz del repositorio, no dentro de una carpeta cogs/.
         for module in ("moderacion", "entretenimiento", "utilidades", "juegos", "musica"):
             try:
