@@ -1,6 +1,8 @@
 """Protecciones opt-in contra spam, invitaciones no deseadas y picos de entradas."""
+import json
 import re
 import time
+import uuid
 from collections import defaultdict, deque
 from datetime import timedelta
 from urllib.parse import urlparse
@@ -86,6 +88,10 @@ def count_recent_events(events: deque, now: float, window_seconds: int) -> int:
 
 
 class Seguridad(commands.Cog):
+    guardia = app_commands.Group(
+        name="guardia",
+        description="Herramientas avanzadas de seguridad y moderacion para el staff",
+    )
     """Funciones automáticas opt-in. No expulsa ni banea por una detección automática."""
 
     def __init__(self, bot):
@@ -98,6 +104,8 @@ class Seguridad(commands.Cog):
         self.last_raid_alert = {}
         self.recent_texts = defaultdict(deque)
         self.last_report_at = {}
+        self.staff_notes = load_json('staff_notes.json', {})
+        self.incidents = load_json('security_incidents.json', {})
 
     def guild_config(self, guild_id: int) -> dict:
         return self.settings.setdefault(str(guild_id), {})
@@ -390,7 +398,7 @@ class Seguridad(commands.Cog):
             return await interaction.response.send_message("no pude enviar el reporte; avisa al staff por otro medio.", ephemeral=True)
         await interaction.response.send_message("reporte enviado de forma privada al canal de moderacion. el staff revisara el contexto.", ephemeral=True)
 
-    @app_commands.command(name="auditoria_permisos", description="Revisa permisos delicados de everyone y del bot")
+    @guardia.command(name="auditoria_permisos", description="Revisa permisos delicados de everyone y del bot")
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_guild=True)
     async def auditoria_permisos(self, interaction: discord.Interaction):
@@ -426,6 +434,356 @@ class Seguridad(commands.Cog):
         embed.set_footer(text="Auditoria orientativa; no cambia permisos automaticamente.")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+
+    @guardia.command(name="enlace_comprobar", description="Comprueba si un enlace coincide con patrones bloqueados")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def enlace_comprobar(self, interaction: discord.Interaction, enlace: app_commands.Range[str, 5, 300]):
+        invitation = contains_discord_invite(enlace)
+        suspicious = contains_suspicious_link(enlace)
+        if invitation:
+            status = "coincide con un patron de invitacion de Discord."
+        elif suspicious:
+            status = "coincide con un dominio conocido de rastreo/phishing."
+        else:
+            status = "no coincide con la lista local de bloqueo. Esto no garantiza que sea seguro."
+        await interaction.response.send_message(f"resultado: {status}", ephemeral=True)
+
+    @guardia.command(name="palabra_previsualizar", description="Prueba una frase contra el filtro personalizado")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def palabra_previsualizar(self, interaction: discord.Interaction, texto: app_commands.Range[str, 1, 300]):
+        words = self.guild_config(interaction.guild_id).get("blocked_words", [])
+        matches = contains_blocked_word(texto, words)
+        result = "coincidiria con una regla configurada." if matches else "no coincide con las reglas de palabras configuradas."
+        await interaction.response.send_message(f"el texto {result} no borre ni guarde el texto de prueba.", ephemeral=True)
+
+    @guardia.command(name="log_prueba", description="Comprueba que el canal de logs recibe mensajes")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def log_prueba(self, interaction: discord.Interaction):
+        log_channels = load_json("log_channels.json", {})
+        raw_id = log_channels.get(str(interaction.guild_id))
+        channel = interaction.guild.get_channel(int(raw_id)) if raw_id else None
+        if channel is None:
+            return await interaction.response.send_message("no hay canal de logs configurado; usa /setlogchannel primero.", ephemeral=True)
+        await self.security_log(interaction.guild, f"prueba de logs solicitada por {interaction.user} ({interaction.user.id}).")
+        await interaction.response.send_message(f"envie una prueba a {channel.mention}.", ephemeral=True)
+
+    @guardia.command(name="reporte_prueba", description="Comprueba el canal de reportes sin crear una denuncia")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def reporte_prueba(self, interaction: discord.Interaction):
+        channel_id = self.guild_config(interaction.guild_id).get("report_channel")
+        channel = interaction.guild.get_channel(int(channel_id)) if channel_id else None
+        if channel is None:
+            return await interaction.response.send_message("no hay canal de reportes configurado; usa /canal_reportes.", ephemeral=True)
+        try:
+            await channel.send(
+                f"prueba del sistema de reportes solicitada por {interaction.user} ({interaction.user.id}).",
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            return await interaction.response.send_message("no pude escribir en el canal de reportes; revisa sus permisos.", ephemeral=True)
+        await interaction.response.send_message(f"prueba enviada a {channel.mention}.", ephemeral=True)
+
+    @guardia.command(name="nota_agregar", description="Guarda una nota de moderacion interna sobre un miembro")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def nota_agregar(self, interaction: discord.Interaction, usuario: discord.Member, nota: app_commands.Range[str, 5, 300]):
+        guild_key, user_key = str(interaction.guild_id), str(usuario.id)
+        guild_notes = self.staff_notes.setdefault(guild_key, {})
+        notes = guild_notes.setdefault(user_key, [])
+        note_id = uuid.uuid4().hex[:8]
+        notes.append({
+            "id": note_id,
+            "text": discord.utils.escape_mentions(nota.strip()),
+            "author_id": interaction.user.id,
+            "created_at": int(time.time()),
+        })
+        guild_notes[user_key] = notes[-50:]
+        save_json("staff_notes.json", self.staff_notes)
+        await interaction.response.send_message(f"nota interna guardada con ID {note_id}. usala solo para informacion relevante de moderacion.", ephemeral=True)
+        await self.security_log(interaction.guild, f"nota interna añadida por {interaction.user} para el miembro {usuario.id}.")
+
+    @guardia.command(name="notas_usuario", description="Consulta notas internas de moderacion de un miembro")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def notas_usuario(self, interaction: discord.Interaction, usuario: discord.Member):
+        notes = self.staff_notes.get(str(interaction.guild_id), {}).get(str(usuario.id), [])
+        if not notes:
+            return await interaction.response.send_message("ese miembro no tiene notas internas guardadas.", ephemeral=True)
+        lines = []
+        for note in notes[-10:]:
+            stamp = int(note.get("created_at", 0))
+            lines.append(f"ID {note.get('id', '?')} - <t:{stamp}:d> - staff {note.get('author_id', '?')}\n{note.get('text', '')}")
+        embed = discord.Embed(
+            title=f"Notas internas: {discord.utils.escape_mentions(usuario.display_name)}",
+            description="\n\n".join(lines)[:3900],
+            color=discord.Color.orange(),
+        )
+        embed.set_footer(text="Solo para revision del staff; no guardes datos sensibles innecesarios.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @guardia.command(name="nota_borrar", description="Elimina una nota interna usando su ID")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def nota_borrar(self, interaction: discord.Interaction, usuario: discord.Member, nota_id: app_commands.Range[str, 8, 8]):
+        guild_notes = self.staff_notes.get(str(interaction.guild_id), {})
+        notes = guild_notes.get(str(usuario.id), [])
+        kept = [note for note in notes if note.get("id") != nota_id]
+        if len(kept) == len(notes):
+            return await interaction.response.send_message("no encontre una nota con ese ID para ese miembro.", ephemeral=True)
+        if kept:
+            guild_notes[str(usuario.id)] = kept
+        else:
+            guild_notes.pop(str(usuario.id), None)
+        save_json("staff_notes.json", self.staff_notes)
+        await interaction.response.send_message(f"nota {nota_id} eliminada.", ephemeral=True)
+        await self.security_log(interaction.guild, f"nota interna {nota_id} eliminada por {interaction.user}.")
+
+    @guardia.command(name="incidente_crear", description="Registra un incidente para seguimiento del staff")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def incidente_crear(self, interaction: discord.Interaction, titulo: app_commands.Range[str, 3, 80], detalle: app_commands.Range[str, 10, 500]):
+        guild_key = str(interaction.guild_id)
+        incidents = self.incidents.setdefault(guild_key, [])
+        incident_id = uuid.uuid4().hex[:8]
+        incidents.append({
+            "id": incident_id,
+            "title": discord.utils.escape_mentions(titulo.strip()),
+            "details": discord.utils.escape_mentions(detalle.strip()),
+            "status": "abierto",
+            "created_by": interaction.user.id,
+            "created_at": int(time.time()),
+        })
+        self.incidents[guild_key] = incidents[-100:]
+        save_json("security_incidents.json", self.incidents)
+        await interaction.response.send_message(f"incidente registrado con ID {incident_id}; usa /guardia incidentes para consultarlo.", ephemeral=True)
+        await self.security_log(interaction.guild, f"incidente {incident_id} registrado por {interaction.user}.")
+
+    @guardia.command(name="incidentes", description="Lista los incidentes recientes del servidor")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def incidentes(self, interaction: discord.Interaction):
+        incidents = self.incidents.get(str(interaction.guild_id), [])
+        if not incidents:
+            return await interaction.response.send_message("no hay incidentes registrados.", ephemeral=True)
+        lines = [
+            f"{item.get('id', '?')} - {item.get('status', 'abierto')} - {item.get('title', 'sin titulo')}"
+            for item in reversed(incidents[-12:])
+        ]
+        embed = discord.Embed(title="Incidentes recientes", description="\n".join(lines)[:3900], color=discord.Color.orange())
+        embed.set_footer(text="Registros internos; registrar un incidente no verifica las alegaciones.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @guardia.command(name="incidente_cerrar", description="Marca un incidente como resuelto")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def incidente_cerrar(self, interaction: discord.Interaction, incidente_id: app_commands.Range[str, 8, 8]):
+        incidents = self.incidents.get(str(interaction.guild_id), [])
+        incident = next((item for item in incidents if item.get("id") == incidente_id), None)
+        if incident is None:
+            return await interaction.response.send_message("no encontre ese incidente.", ephemeral=True)
+        if incident.get("status") == "cerrado":
+            return await interaction.response.send_message("ese incidente ya estaba cerrado.", ephemeral=True)
+        incident["status"] = "cerrado"
+        incident["closed_by"] = interaction.user.id
+        incident["closed_at"] = int(time.time())
+        save_json("security_incidents.json", self.incidents)
+        await interaction.response.send_message(f"incidente {incidente_id} marcado como cerrado.", ephemeral=True)
+        await self.security_log(interaction.guild, f"incidente {incidente_id} cerrado por {interaction.user}.")
+
+    @guardia.command(name="incidente_reabrir", description="Reabre un incidente que estaba cerrado")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def incidente_reabrir(self, interaction: discord.Interaction, incidente_id: app_commands.Range[str, 8, 8]):
+        incidents = self.incidents.get(str(interaction.guild_id), [])
+        incident = next((item for item in incidents if item.get("id") == incidente_id), None)
+        if incident is None:
+            return await interaction.response.send_message("no encontre ese incidente.", ephemeral=True)
+        if incident.get("status") != "cerrado":
+            return await interaction.response.send_message("ese incidente no esta cerrado.", ephemeral=True)
+        incident["status"] = "abierto"
+        incident.pop("closed_by", None)
+        incident.pop("closed_at", None)
+        save_json("security_incidents.json", self.incidents)
+        await interaction.response.send_message(f"incidente {incidente_id} reabierto.", ephemeral=True)
+
+    @guardia.command(name="raid_estado", description="Muestra cuantas entradas recientes registra el detector anti-raid")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def raid_estado(self, interaction: discord.Interaction):
+        cfg = self.guild_config(interaction.guild_id).get("anti_raid", {})
+        window = max(3, min(int(cfg.get("window", 10)), 60))
+        events = self.join_times[interaction.guild_id]
+        count = count_recent_events(events, time.monotonic(), window)
+        threshold = max(3, min(int(cfg.get("threshold", 8)), 50))
+        await interaction.response.send_message(
+            f"anti-raid {'activado' if cfg.get('enabled') else 'desactivado'}. registro local: {count} entrada(s) en {window} s; umbral {threshold}.",
+            ephemeral=True,
+        )
+
+    @guardia.command(name="contadores_reset", description="Limpia los contadores antispam de un miembro")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def contadores_reset(self, interaction: discord.Interaction, usuario: discord.Member):
+        guild_id, user_id = interaction.guild_id, usuario.id
+        for key in list(self.message_times):
+            if key[0] == guild_id and key[-1] == user_id:
+                self.message_times.pop(key, None)
+                self.last_spam_action.pop(key, None)
+        for key in list(self.recent_texts):
+            if key[0] == guild_id and key[-1] == user_id:
+                self.recent_texts.pop(key, None)
+        await interaction.response.send_message(f"contadores temporales limpiados para {discord.utils.escape_mentions(usuario.display_name)}.", ephemeral=True)
+
+    @guardia.command(name="filtros_lista", description="Muestra todos los filtros automaticos configurados")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def filtros_lista(self, interaction: discord.Interaction):
+        cfg = self.guild_config(interaction.guild_id)
+        filters = [
+            ("anti-spam", cfg.get("anti_spam", {})),
+            ("anti-raid", cfg.get("anti_raid", {})),
+            ("invitaciones/enlaces", cfg.get("anti_invites", {})),
+            ("anti-menciones", cfg.get("anti_mentions", {})),
+            ("anti-repeticion", cfg.get("anti_repeat", {})),
+            ("caps", cfg.get("caps_filter", {})),
+        ]
+        lines = [f"{name}: {'ON' if settings.get('enabled') else 'OFF'}" for name, settings in filters]
+        lines.append(f"palabras/frases bloqueadas: {len(cfg.get('blocked_words', []))}")
+        lines.append(f"canales excluidos manualmente: {len(cfg.get('excluded_channels', {}))}")
+        embed = discord.Embed(title="Resumen de filtros", description="\n".join(lines), color=discord.Color.blurple())
+        embed.add_field(name="Reportes", value="configurado" if cfg.get("report_channel") else "sin configurar", inline=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @guardia.command(name="filtros_reset", description="Desactiva filtros y borra reglas personalizadas con confirmacion")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def filtros_reset(self, interaction: discord.Interaction, confirmar: bool):
+        if not confirmar:
+            return await interaction.response.send_message("no hice cambios. vuelve a ejecutar con confirmar=true para desactivar los filtros y borrar palabras/canales excluidos.", ephemeral=True)
+        cfg = self.guild_config(interaction.guild_id)
+        for key in ("anti_spam", "anti_raid", "anti_invites", "anti_mentions", "anti_repeat", "caps_filter"):
+            cfg[key] = {"enabled": False}
+        cfg["blocked_words"] = []
+        cfg["excluded_channels"] = {}
+        self.save_settings()
+        await interaction.response.send_message("filtros automaticos desactivados y reglas personalizadas borradas. el canal de reportes se conserva.", ephemeral=True)
+        await self.security_log(interaction.guild, f"filtros reiniciados por {interaction.user}.")
+
+    @guardia.command(name="excluir_canal", description="Excluye un canal de los filtros automaticos")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def excluir_canal(self, interaction: discord.Interaction, canal: discord.TextChannel, motivo: app_commands.Range[str, 3, 100]):
+        cfg = self.guild_config(interaction.guild_id)
+        excluded = cfg.setdefault("excluded_channels", {})
+        if str(canal.id) not in excluded and len(excluded) >= 20:
+            return await interaction.response.send_message("solo puedes excluir hasta 20 canales.", ephemeral=True)
+        excluded[str(canal.id)] = discord.utils.escape_mentions(motivo.strip())
+        self.save_settings()
+        await interaction.response.send_message(f"{canal.mention} quedo excluido de filtros automaticos. tambien deja de recibir protecciones de esos filtros.", ephemeral=True)
+        await self.security_log(interaction.guild, f"canal excluido de filtros por {interaction.user}: #{canal.name}.")
+
+    @guardia.command(name="incluir_canal", description="Vuelve a aplicar filtros en un canal excluido")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def incluir_canal(self, interaction: discord.Interaction, canal: discord.TextChannel):
+        cfg = self.guild_config(interaction.guild_id)
+        excluded = cfg.setdefault("excluded_channels", {})
+        if str(canal.id) not in excluded:
+            return await interaction.response.send_message("ese canal no estaba excluido.", ephemeral=True)
+        excluded.pop(str(canal.id), None)
+        self.save_settings()
+        await interaction.response.send_message(f"filtros automaticos reactivados para {canal.mention}.", ephemeral=True)
+        await self.security_log(interaction.guild, f"filtros reactivados en #{canal.name} por {interaction.user}.")
+
+    @guardia.command(name="mensaje_analizar", description="Analiza texto con filtros locales sin borrar ni guardar")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def mensaje_analizar(self, interaction: discord.Interaction, texto: app_commands.Range[str, 1, 500]):
+        cfg = self.guild_config(interaction.guild_id)
+        flags = []
+        if contains_discord_invite(texto):
+            flags.append("invitacion de Discord")
+        if contains_suspicious_link(texto):
+            flags.append("dominio de rastreo/phishing conocido")
+        if contains_blocked_word(texto, cfg.get("blocked_words", [])):
+            flags.append("regla de palabra/frase personalizada")
+        caps = cfg.get("caps_filter", {})
+        if caps.get("enabled") and is_caps_spam(texto, int(caps.get("percent", 85)), int(caps.get("minimum", 12))):
+            flags.append("exceso de mayusculas")
+        result = "\n".join(f"• {item}" for item in flags) if flags else "no coincide con los filtros locales revisados."
+        await interaction.response.send_message(f"analisis local (no es una garantia de seguridad):\n{result}\nno borre ni almacene el texto enviado.", ephemeral=True)
+
+    @guardia.command(name="url_bloqueadas", description="Lista dominios de rastreo/phishing reconocidos por el filtro")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def url_bloqueadas(self, interaction: discord.Interaction):
+        description = "\n".join(f"• {domain}" for domain in sorted(SUSPICIOUS_DOMAINS))
+        await interaction.response.send_message(f"lista local de dominios vigilados:\n{description}", ephemeral=True)
+
+    @guardia.command(name="spam_estado_usuario", description="Consulta contadores temporales de spam de un miembro")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def spam_estado_usuario(self, interaction: discord.Interaction, usuario: discord.Member):
+        rows = []
+        now = time.monotonic()
+        for key, events in list(self.message_times.items()):
+            if key[0] != interaction.guild_id or key[-1] != usuario.id:
+                continue
+            count_recent_events(events, now, 60)
+            if events:
+                rows.append(f"canal {key[1]}: {len(events)} evento(s) en los ultimos 60 s")
+        description = "\n".join(rows) or "no hay contadores temporales activos para ese miembro."
+        await interaction.response.send_message(f"contadores locales para {discord.utils.escape_mentions(usuario.display_name)}:\n{description[:1500]}", ephemeral=True)
+
+    @guardia.command(name="reportes_info", description="Consulta la configuracion del canal de reportes")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def reportes_info(self, interaction: discord.Interaction):
+        channel_id = self.guild_config(interaction.guild_id).get("report_channel")
+        channel = interaction.guild.get_channel(int(channel_id)) if channel_id else None
+        if channel is None:
+            return await interaction.response.send_message("el canal de reportes no esta configurado o ya no existe.", ephemeral=True)
+        await interaction.response.send_message(f"los reportes llegan a {channel.mention}. revisa que sea privado para miembros normales.", ephemeral=True)
+
+    @guardia.command(name="activar_basico", description="Activa una configuracion moderada de anti-spam, menciones y repeticiones")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def activar_basico(self, interaction: discord.Interaction):
+        if not interaction.guild.me.guild_permissions.manage_messages:
+            return await interaction.response.send_message("necesito gestionar mensajes para activar este perfil.", ephemeral=True)
+        cfg = self.guild_config(interaction.guild_id)
+        cfg["anti_spam"] = {"enabled": True, "limit": 8, "window": 10, "timeout": 0}
+        cfg["anti_mentions"] = {"enabled": True, "limit": 5}
+        cfg["anti_repeat"] = {"enabled": True, "repeats": 4, "window": 15}
+        self.save_settings()
+        await interaction.response.send_message("perfil basico activado: 8 mensajes/10 s, maximo 5 menciones y 4 repeticiones/15 s. no activa caps ni filtro de enlaces.", ephemeral=True)
+        await self.security_log(interaction.guild, f"perfil basico activado por {interaction.user}.")
+
+    @guardia.command(name="desactivar_automaticos", description="Apaga filtros automaticos sin borrar sus configuraciones")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def desactivar_automaticos(self, interaction: discord.Interaction):
+        cfg = self.guild_config(interaction.guild_id)
+        for key in ("anti_spam", "anti_raid", "anti_invites", "anti_mentions", "anti_repeat", "caps_filter"):
+            if isinstance(cfg.get(key), dict):
+                cfg[key]["enabled"] = False
+        self.save_settings()
+        await interaction.response.send_message("filtros automaticos apagados; sus valores se conservaron. el filtro de palabras sigue activo hasta borrarlo o usar /guardia filtros_reset.", ephemeral=True)
+        await self.security_log(interaction.guild, f"filtros automaticos desactivados por {interaction.user}.")
+
+    @guardia.command(name="config_exportar", description="Exporta configuracion de seguridad en formato JSON")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(administrator=True)
+    async def config_exportar(self, interaction: discord.Interaction):
+        exported = json.dumps(self.guild_config(interaction.guild_id), ensure_ascii=False, indent=2)
+        if len(exported) > 1700:
+            return await interaction.response.send_message("la configuracion es demasiado grande para enviarla en una sola respuesta. revisa /guardia filtros_lista.", ephemeral=True)
+        await interaction.response.send_message(f"copia de configuracion; guardala con cuidado:\n{exported}", ephemeral=True)
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.guild is None or message.author.bot or message.webhook_id:
@@ -437,6 +795,9 @@ class Seguridad(commands.Cog):
             return
 
         cfg = self.settings.get(str(message.guild.id), {})
+        excluded_channels = cfg.get("excluded_channels", {})
+        if isinstance(excluded_channels, dict) and str(message.channel.id) in excluded_channels:
+            return
 
         invite_cfg = cfg.get("anti_invites", {})
         if invite_cfg.get("enabled") and (contains_discord_invite(message.content) or contains_suspicious_link(message.content)):
