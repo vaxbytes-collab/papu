@@ -21,6 +21,8 @@ PERSISTED_JSON_FILES = (
     "chat_histories.json",
     "security_settings.json",
     "afk.json",
+    "staff_notes.json",
+    "security_incidents.json",
 )
 _LOCK = RLock()
 
