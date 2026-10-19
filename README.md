@@ -28,6 +28,7 @@ Configura las variables de entorno (por ejemplo, en un archivo `.env` local que 
 - `GROQ_API_KEY`: opcional; habilita chat y analisis de moderacion IA.
 - `GROQ_CHAT_MODEL`: modelo conversacional opcional.
 - `GROQ_MODERATION_MODEL`: modelo clasificador opcional.
+- `DATABASE_URL`: URL de conexión PostgreSQL. Cuando se configura, todos los datos persistentes se guardan en la base de datos.
 - `PAPU_DATA_DIR`: directorio donde se guardan los JSON. En local, por defecto es `data/`; en Render, por defecto es `/var/data`.
 - `PORT`: puerto del endpoint de estado (por defecto 8080).
 
@@ -100,11 +101,16 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 
 ## Persistencia
 
-Todos los datos persistentes de Papu (michis, recordatorios, eventos, sugerencias, avisos y configuracion de los servidores) se guardan en el mismo directorio definido por `PAPU_DATA_DIR`. En local usa `data/`; en Render usa `/var/data`.
+Papu usa **PostgreSQL externo** si existe la variable `DATABASE_URL`; si no, usa JSON local para desarrollo. Todos los módulos utilizan el mismo almacenamiento: michis, recordatorios, eventos, sugerencias, avisos de moderación y configuraciones por servidor. El esquema se crea automáticamente al arrancar.
 
-**Importante para Render:** el sistema de archivos normal del servicio es efimero: sus cambios se pierden al volver a desplegar o reiniciar. Para conservar los datos, adjunta un **Persistent Disk** desde el panel de Render con punto de montaje exacto `/var/data` y usa ese mismo valor en `PAPU_DATA_DIR` si la variable esta definida manualmente. El disco persistente requiere un plan de Render compatible; en un servicio sin disco, el codigo solo puede avisar, no evitar que Render borre el sistema de archivos efimero.
+### Conectar la base de datos en Render
 
-Al arrancar, Papu intenta migrar los JSON antiguos desde la raiz del proyecto o desde `data/` al directorio nuevo, pero solo si los archivos antiguos siguen disponibles y no hay ya un archivo en destino. Esto no puede recuperar datos que Render ya haya borrado en despliegues anteriores. Los JSON son adecuados para una instancia pequeña; para multiples procesos o alto volumen, considera PostgreSQL.
+1. Crea una base de datos PostgreSQL en un proveedor compatible (por ejemplo, [Neon](https://neon.com/)).
+2. Copia su URL de conexión. Si el proveedor ofrece una conexión agrupada/pooler, úsala para el bot; conserva los parámetros SSL que entregue el proveedor.
+3. En Render, abre el servicio **papu** → **Environment** → añade `DATABASE_URL` con la URL. No la escribas en el repositorio ni la compartas en Discord.
+4. Guarda la variable y deja que Render despliegue. Al arrancar, Papu comprueba la conexión y crea la tabla `papu_json_store`; si la base de datos falla, no cambia silenciosamente al almacenamiento local, porque eso podría crear una instancia con datos aparentemente vacíos.
+
+La primera inicialización intenta importar los JSON que todavía existan en la raíz, en `data/` o en `/var/data`. La importación no reemplaza datos ya existentes en PostgreSQL. Si Render ya borró los JSON anteriores, no se pueden recuperar desde el código: será necesario restaurar una copia de seguridad para recuperarlos. Si no se configura `DATABASE_URL`, Render sigue necesitando un Persistent Disk en `/var/data` para conservar archivos entre despliegues.
 
 ## Seguridad, permisos y privacidad
 
