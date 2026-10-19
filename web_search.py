@@ -128,36 +128,47 @@ def build_search_query(text: str, history: Iterable[dict] = ()) -> str:
 
 
 def search_web(query: str, max_results: int = 5) -> list[dict[str, str]]:
-    """Busca en Google primero, con Brave como respaldo, y devuelve titulo, URL y resumen."""
+    """Busca primero en Google y prueba motores alternativos si falla."""
     query = _clean(query)[:280]
     if not query:
         return []
     max_results = max(1, min(int(max_results), 5))
-    raw_results = DDGS(timeout=8).text(
-        query,
-        region="es-es",
-        safesearch="moderate",
-        max_results=max_results,
-        # Google es el motor principal; Brave queda como respaldo si Google no responde.
-        backend="google, brave",
-    )
-    output: list[dict[str, str]] = []
-    seen = set()
-    for item in raw_results or []:
-        if not isinstance(item, dict):
-            continue
-        title = _clean(str(item.get("title", "")))[:180]
-        url = _clean(str(item.get("href") or item.get("url") or ""))
-        snippet = _clean(str(item.get("body") or item.get("snippet") or ""))[:650]
-        parsed = urlparse(url)
-        if not title or parsed.scheme not in {"http", "https"} or not parsed.netloc or url in seen:
-            continue
-        seen.add(url)
-        output.append({"title": title, "url": url, "snippet": snippet})
-        if len(output) >= max_results:
-            break
-    return output
 
+    # DDGS puede lanzar una excepcion por un motor aunque otros si tengan resultados.
+    # Consultarlos por separado evita que el fallo de Google invalide los demas motores.
+    for backend in ("google", "brave", "bing", "duckduckgo"):
+        try:
+            raw_results = DDGS(timeout=2.5).text(
+                query,
+                region="es-es",
+                safesearch="moderate",
+                max_results=max_results,
+                backend=backend,
+            )
+        except Exception:
+            # Google a veces bloquea o no devuelve resultados desde algunos alojamientos.
+            # No dejes que ese fallo interrumpa el chat; continua con el siguiente motor.
+            continue
+
+        output: list[dict[str, str]] = []
+        seen = set()
+        for item in raw_results or []:
+            if not isinstance(item, dict):
+                continue
+            title = _clean(str(item.get("title", "")))[:180]
+            url = _clean(str(item.get("href") or item.get("url") or ""))
+            snippet = _clean(str(item.get("body") or item.get("snippet") or ""))[:650]
+            parsed = urlparse(url)
+            if not title or parsed.scheme not in {"http", "https"} or not parsed.netloc or url in seen:
+                continue
+            seen.add(url)
+            output.append({"title": title, "url": url, "snippet": snippet})
+            if len(output) >= max_results:
+                break
+        if output:
+            return output
+
+    return []
 
 def format_search_context(query: str, results: list[dict[str, str]]) -> str:
     """Empaqueta resultados como evidencia externa no confiable para el modelo."""
