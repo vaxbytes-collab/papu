@@ -29,6 +29,8 @@ class ChatPolicyTests(unittest.TestCase):
         self.assertIn("cero racismo", PROMPT_SISTEMA)
         self.assertIn("no como un contestador automatico", PROMPT_SISTEMA)
         self.assertIn("nunca fabriques tracklists", PROMPT_SISTEMA)
+        self.assertIn('RESULTADOS DE BUSQUEDA WEB', PROMPT_SISTEMA)
+        self.assertIn("no decir que no puedes buscar", PROMPT_SISTEMA)
         self.assertIn("no inventes lo que siente la persona", PROMPT_SISTEMA)
 
     def test_language_complaint_is_detected(self):
