@@ -57,12 +57,12 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 - `/setlogchannel`, `/logconfig`: registros del servidor.
 - `/aimoderacion activar`, `/modcheck texto`: alertas de IA y revision manual.
 - `/canal_chat [canal]`: canal optativo donde Papu responde sin mencion; omitir el canal desactiva esa funcion.
-- `/warn`, `/warns`, `/clearwarns`, `/kick`, `/ban`, `/unban`, `/timeout`, `/untimeout`, `/purge`, `/slowmode`, `/lock`, `/unlock`.
+- `/warn`, `/warns`, `/unwarn`, `/clearwarns`, `/diagnostico`, `/kick`, `/ban`, `/unban`, `/timeout`, `/untimeout`, `/purge`, `/slowmode`, `/lock`, `/unlock`.
 - `/userinfo`, `/serverinfo`, `/ping`.
 
 ### Minijuegos y mascota
 - `/ppt`, `/dado`, `/moneda`, `/8ball`, `/trivia`, `/caos`.
-- `/michi_adoptar [nombre]`, `/michi`, `/michi_cuidar`, `/michi_comida`, `/michi_jugar`.
+- `/michi_adoptar [nombre]`, `/michi`, `/michi_cuidar`, `/michi_comida`, `/michi_jugar`.\n- Los comandos heredados de entretenimiento usan `/ppt_clasico`, `/dado_clasico`, `/moneda_clasica`, `/bola8_clasica` y `/serverinfo_clasico` para no duplicar nombres.
 
 ### Musica
 - `/play consulta`, `/cola`, `/pause`, `/resume`, `/skip`, `/stop`.
