@@ -21,3 +21,26 @@ def is_contextless_numeric_message(text: str) -> bool:
     """Identifica mensajes formados solo por números y puntuación."""
     value = (text or "").strip()
     return bool(value) and bool(re.fullmatch(r"[\d\s.,!?¿¡:;#*_~'\"-]+", value))
+
+
+def is_spanish_language_complaint(text: str) -> bool:
+    """Detecta si la persona pregunta en español por una respuesta en inglés."""
+    value = (text or "").strip().lower()
+    asks_why = bool(re.search(r"\b(por\s+qu[eé]|porque|pq)\b", value))
+    mentions_english = bool(re.search(r"\b(ingl[eé]s|english)\b", value))
+    mentions_replying = bool(
+        re.search(r"\b(hablas|hablar|respondes|responder|contestaste|contestando|respondiste|escribes)\b", value)
+    )
+    return asks_why and mentions_english and mentions_replying
+
+
+def deterministic_chat_reply(text: str, *, has_prior_context: bool, has_attachments: bool = False):
+    """Responde localmente a dos casos claros; devuelve None en el resto."""
+    if is_spanish_language_complaint(text):
+        return (
+            "Tienes razón, papu, me equivoqué al responder en inglés 😅. "
+            "Voy a seguir en español; no debí asumir que querías inglés. ¿Qué necesitabas? :v"
+        )
+    if not has_prior_context and not has_attachments and is_contextless_numeric_message(text):
+        return f"Solo me llegó un «{text[:80]}», papu 😅. ¿Qué querías decir? :v"
+    return None
