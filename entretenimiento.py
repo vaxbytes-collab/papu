@@ -89,17 +89,6 @@ class Entretenimiento(commands.Cog):
         embed.set_image(url=usuario.avatar.url if usuario.avatar else usuario.default_avatar.url)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="serverinfo_clasico", description="Muestra la información oficial del servidor")
-    async def serverinfo(self, interaction: discord.Interaction):
-        guild = interaction.guild
-        embed = discord.Embed(title=f"Información de {guild.name} :v", color=discord.Color.green())
-        embed.add_field(name="Dueño", value=guild.owner.mention if guild.owner else "Desconocido", inline=True)
-        embed.add_field(name="Miembros", value=f"{guild.member_count} papus", inline=True)
-        embed.add_field(name="Creación", value=guild.created_at.strftime("%d/%m/%Y"), inline=True)
-        if guild.icon:
-            embed.set_thumbnail(url=guild.icon.url)
-        await interaction.response.send_message(embed=embed)
-
     @app_commands.command(name="dilema", description="Te plantea un dilema divertido y sano")
     async def dilema(self, interaction: discord.Interaction):
         dilemas = [
