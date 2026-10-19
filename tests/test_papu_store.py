@@ -38,6 +38,24 @@ class PapuStoreTests(unittest.TestCase):
             Path("/project/data"),
         )
 
+    def test_render_relative_data_dir_is_resolved_inside_persistent_disk(self):
+        self.assertEqual(
+            papu_store._select_data_dir(
+                {"RENDER_SERVICE_ID": "srv-test", "PAPU_DATA_DIR": "data"},
+                cwd="/project",
+            ),
+            Path("/var/data/data"),
+        )
+
+    def test_render_dot_directory_does_not_escape_persistent_disk(self):
+        self.assertEqual(
+            papu_store._select_data_dir(
+                {"RENDER_SERVICE_ID": "srv-test", "PAPU_DATA_DIR": "."},
+                cwd="/project",
+            ),
+            Path("/var/data/."),
+        )
+
     def test_round_trip_unicode_and_nested_data(self):
         value = {"guild": {"michi": "Bigotes 🐈", "coins": 12}}
         papu_store.save_json("state.json", value)
