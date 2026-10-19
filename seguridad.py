@@ -12,6 +12,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from papu_store import load_json, save_json
+from moderation_cases import make_case_embed, next_case_id
 
 INVITE_RE = re.compile(
     r"(?i)(?:https?://)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com/invite)/[a-z0-9-]+"
@@ -376,27 +377,67 @@ class Seguridad(commands.Cog):
 
     @app_commands.command(name="reportar", description="Envía un reporte privado al canal de moderacion")
     @app_commands.guild_only()
-    async def reportar(self, interaction: discord.Interaction, usuario: discord.Member, motivo: app_commands.Range[str, 10, 500]):
+    async def reportar(
+        self,
+        interaction: discord.Interaction,
+        usuario: discord.Member,
+        motivo: app_commands.Range[str, 10, 500],
+        texto_mensaje: str = None,
+        enlace_mensaje: str = None,
+    ):
         key = (interaction.guild_id, interaction.user.id)
         now = time.monotonic()
         if now - self.last_report_at.get(key, 0) < 30:
             return await interaction.response.send_message("espera un poco antes de enviar otro reporte.", ephemeral=True)
-        channel_id = self.guild_config(interaction.guild_id).get("report_channel")
+        cfg = self.guild_config(interaction.guild_id)
+        channel_id = cfg.get("report_channel")
         channel = interaction.guild.get_channel(int(channel_id)) if channel_id else None
         if channel is None:
             return await interaction.response.send_message("el staff aun no configuró el canal con /canal_reportes.", ephemeral=True)
-        self.last_report_at[key] = now
-        embed = discord.Embed(title="📨 Nuevo reporte", color=discord.Color.orange(), timestamp=discord.utils.utcnow())
-        embed.add_field(name="Reportado", value=f"{discord.utils.escape_mentions(usuario.display_name)} ({usuario.id})", inline=False)
-        embed.add_field(name="Reportado por", value=f"{discord.utils.escape_mentions(interaction.user.display_name)} ({interaction.user.id})", inline=False)
-        embed.add_field(name="Motivo aportado", value=discord.utils.escape_mentions(motivo.strip())[:900], inline=False)
-        embed.set_footer(text="Reporte no verificado: revisa el contexto antes de actuar.")
+
+        referenced_channel = interaction.channel
+        if enlace_mensaje:
+            match = re.fullmatch(
+                r"https://(?:(?:ptb|canary)\\.)?discord\\.com/channels/(\\d+)/(\\d+)/(\\d+)",
+                enlace_mensaje.strip(),
+            )
+            if not match or int(match.group(1)) != interaction.guild_id:
+                return await interaction.response.send_message(
+                    "el enlace debe ser un enlace de mensaje de este mismo servidor (discord.com/channels/...).",
+                    ephemeral=True,
+                )
+            linked_channel_id = int(match.group(2))
+            referenced_channel = interaction.guild.get_channel_or_thread(linked_channel_id)
+            if referenced_channel is None:
+                referenced_channel = interaction.guild.get_channel(linked_channel_id)
+
+        case_id = next_case_id(interaction.guild_id)
+        embed = make_case_embed(
+            case_id=case_id,
+            title="📨 reporte recibido",
+            username=str(usuario),
+            user_id=usuario.id,
+            channel_name=getattr(referenced_channel, "name", "canal del enlace no disponible"),
+            channel_id=getattr(referenced_channel, "id", None),
+            category="reporte del usuario",
+            severity="sin evaluar",
+            confidence="sin evaluar",
+            reason=motivo.strip(),
+            message_text=(texto_mensaje.strip() if texto_mensaje and texto_mensaje.strip() else "sin texto aportado; revisar el contexto"),
+            message_url=enlace_mensaje.strip() if enlace_mensaje else None,
+            reporter=f"{interaction.user} ({interaction.user.id})",
+            status="REPORTE RECIBIDO: pendiente de revision humana; no se aplico ninguna sancion desde el reporte.",
+            color=discord.Color.orange(),
+        )
         try:
             await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         except (discord.Forbidden, discord.HTTPException):
-            self.last_report_at.pop(key, None)
             return await interaction.response.send_message("no pude enviar el reporte; avisa al staff por otro medio.", ephemeral=True)
-        await interaction.response.send_message("reporte enviado de forma privada al canal de moderacion. el staff revisara el contexto.", ephemeral=True)
+        self.last_report_at[key] = now
+        await interaction.response.send_message(
+            f"reporte #{case_id} enviado de forma privada al canal de moderacion. el staff revisara el contexto.",
+            ephemeral=True,
+        )
 
     @guardia.command(name="auditoria_permisos", description="Revisa permisos delicados de everyone y del bot")
     @app_commands.guild_only()
