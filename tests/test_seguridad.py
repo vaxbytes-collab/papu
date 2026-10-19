@@ -1,7 +1,14 @@
 import unittest
 from collections import deque
 
-from seguridad import contains_discord_invite, contains_suspicious_link, count_recent_events
+from seguridad import (
+    contains_blocked_word,
+    contains_discord_invite,
+    contains_suspicious_link,
+    count_recent_events,
+    is_caps_spam,
+    mention_count,
+)
 
 
 class SecurityHelpersTests(unittest.TestCase):
@@ -48,6 +55,27 @@ class SecurityHelpersTests(unittest.TestCase):
         for text in samples:
             with self.subTest(text=text):
                 self.assertFalse(contains_suspicious_link(text))
+
+    def test_blocked_words_match_whole_words_and_phrases(self):
+        self.assertTrue(contains_blocked_word("no me gusta el SPAM aqui", ["spam"]))
+        self.assertTrue(contains_blocked_word("ese enlace es muy malo", ["muy malo"]))
+        self.assertFalse(contains_blocked_word("spammer", ["spam"]))
+        self.assertFalse(contains_blocked_word("hola mundo", []))
+
+    def test_caps_filter_requires_minimum_letters_and_threshold(self):
+        self.assertTrue(is_caps_spam("ESTO ES UN MENSAJE MUY GRITADO", percent=80, minimum=12))
+        self.assertFalse(is_caps_spam("ESTO", percent=60, minimum=8))
+        self.assertFalse(is_caps_spam("esto es un mensaje normal", percent=80, minimum=12))
+        self.assertFalse(is_caps_spam("MAYUSCULAS y texto normal", percent=90, minimum=12))
+
+    def test_mention_count_includes_users_roles_and_everyone(self):
+        from types import SimpleNamespace
+        message = SimpleNamespace(
+            mentions=[1, 2],
+            role_mentions=[3],
+            mention_everyone=True,
+        )
+        self.assertEqual(mention_count(message), 4)
 
     def test_recent_event_window_discards_old_entries(self):
         events = deque([4.0, 6.0, 8.0])
