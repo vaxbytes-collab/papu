@@ -120,7 +120,7 @@ def build_search_query(text: str, history: Iterable[dict] = ()) -> str:
 
     # Ayuda a que una consulta sobre el album Ye identifique al artista y el formato.
     if re.search(r"\b(track\s*list|tracklist|lista de canciones|lista de temas)\b", query, re.I):
-        if re.search(r"\bye\b", query, re.I) and not re.search(r"kanye\s+west", query, re.I):
+        if re.search(r"\b(ye|the life of pablo|yee?zus|donda|graduation|808s and heartbreak|late registration|college dropout|vultures)\b", query, re.I) and not re.search(r"kanye\s+west", query, re.I):
             query += " Kanye West"
         if "official" not in query.lower() and "oficial" not in query.lower():
             query += " official album tracklist"
