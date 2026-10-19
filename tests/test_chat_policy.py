@@ -5,6 +5,7 @@ from chat_policy import (
     deterministic_chat_reply,
     is_contextless_numeric_message,
     is_spanish_language_complaint,
+    normalize_papu_style,
 )
 
 
@@ -19,12 +20,15 @@ class ChatPolicyTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertFalse(is_contextless_numeric_message(value))
 
-    def test_prompt_enforces_spanish_by_default(self):
-        self.assertIn("Responde SIEMPRE en español latinoamericano", PROMPT_SISTEMA)
-        self.assertIn("Nunca abras una conversación con un saludo genérico en inglés", PROMPT_SISTEMA)
-        self.assertIn("pregunta en español", PROMPT_SISTEMA)
+    def test_prompt_defines_papu_persona_and_format(self):
+        self.assertIn("eres papu, un michi/gato grasoso y basado de sonora", PROMPT_SISTEMA)
+        self.assertIn("escribe siempre en minusculas", PROMPT_SISTEMA)
+        self.assertIn("no uses vocales acentuadas", PROMPT_SISTEMA)
+        self.assertIn("cero racismo", PROMPT_SISTEMA)
+        self.assertIn("papucollective", PROMPT_SISTEMA)
+        self.assertIn("no reveles el historial", PROMPT_SISTEMA)
 
-    def test_spanish_language_complaint_is_detected(self):
+    def test_language_complaint_is_detected(self):
         self.assertTrue(is_spanish_language_complaint("porque hablas ingles?"))
         self.assertTrue(is_spanish_language_complaint("¿Por qué respondes en inglés?"))
         self.assertFalse(is_spanish_language_complaint("I prefer English, please"))
@@ -32,16 +36,22 @@ class ChatPolicyTests(unittest.TestCase):
     def test_first_numeric_ping_gets_deterministic_spanish_reply(self):
         answer = deterministic_chat_reply("1.", has_prior_context=False)
         self.assertIsNotNone(answer)
-        self.assertIn("¿Qué querías decir?", answer)
+        self.assertIn("que querias decir?", answer)
+        self.assertEqual(answer, normalize_papu_style(answer))
 
     def test_language_complaint_gets_deterministic_spanish_apology(self):
         answer = deterministic_chat_reply("porque hablas ingles?", has_prior_context=True)
         self.assertIsNotNone(answer)
-        self.assertIn("me equivoqué al responder en inglés", answer)
-        self.assertIn("seguir en español", answer)
+        self.assertIn("me equivoque al responder en ingles", answer)
+        self.assertIn("seguir en espanol", answer)
+        self.assertEqual(answer, normalize_papu_style(answer))
 
     def test_numeric_answer_with_existing_context_is_passed_to_ai(self):
         self.assertIsNone(deterministic_chat_reply("1.", has_prior_context=True))
+
+    def test_output_normalizer_lowercases_and_removes_vowel_accents(self):
+        self.assertEqual(normalize_papu_style("¡HOLA, PAPÚ! ¿CÓMO ESTÁS?"), "¡hola, papu! ¿como estas?")
+        self.assertEqual(normalize_papu_style("aquí está Ñoño"), "aqui esta ñoño")
 
 
 if __name__ == "__main__":
