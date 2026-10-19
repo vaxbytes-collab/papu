@@ -8,15 +8,14 @@ import os
 import re
 import tempfile
 from datetime import timedelta
-from pathlib import Path
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from groq_config import get_groq_model
+from papu_store import DATA_DIR
 
-DATA_DIR = Path(os.getenv("PAPU_DATA_DIR", "."))
 LOGS_FILE = DATA_DIR / "log_channels.json"
 WARNS_FILE = DATA_DIR / "warns.json"
 SETTINGS_FILE = DATA_DIR / "moderation_settings.json"
