@@ -3,6 +3,7 @@ import re
 import time
 from collections import defaultdict, deque
 from datetime import timedelta
+from urllib.parse import urlparse
 
 import discord
 from discord import app_commands
@@ -14,6 +15,38 @@ INVITE_RE = re.compile(
     r"(?i)(?:https?://)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com/invite)/[a-z0-9-]+"
 )
 
+
+
+URL_RE = re.compile(r"(?i)(?:https?://|www\.)?[^\s<>]+")
+SUSPICIOUS_DOMAINS = {
+    "grabify.link",
+    "iplogger.org",
+    "iplogger.com",
+    "iplogger.ru",
+    "iplogger.info",
+    "iplogger.net",
+    "2no.co",
+    "yip.su",
+    "discordnitro.com",
+    "discord-gift.com",
+    "dlscordapp.com",
+    "steamcomunnity.com",
+}
+
+
+def contains_suspicious_link(content: str) -> bool:
+    """Detecta dominios conocidos de rastreo/phishing sin bloquear cualquier URL."""
+    for match in URL_RE.finditer(content or ""):
+        candidate = match.group(0).rstrip(".,!?;:)]}>\\"'")
+        if not candidate:
+            continue
+        parsed = urlparse(candidate if "://" in candidate else f"https://{candidate}")
+        host = (parsed.hostname or "").lower().rstrip(".")
+        if host.startswith("www."):
+            host = host[4:]
+        if any(host == domain or host.endswith("." + domain) for domain in SUSPICIOUS_DOMAINS):
+            return True
+    return False
 
 def contains_discord_invite(content: str) -> bool:
     """Solo detecta invitaciones de Discord; los enlaces normales no se bloquean."""
@@ -124,14 +157,14 @@ class Seguridad(commands.Cog):
         await interaction.response.send_message(description, ephemeral=True)
         await self.security_log(interaction.guild, f"🚨 Configuracion anti-raid cambiada por {interaction.user}: {description}")
 
-    @app_commands.command(name="antienlaces", description="Activa el bloqueo de invitaciones de Discord")
+    @app_commands.command(name="antienlaces", description="Bloquea invitaciones y dominios conocidos de phishing/rastreo")
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(administrator=True)
     async def antienlaces(self, interaction: discord.Interaction, activar: bool):
         cfg = self.guild_config(interaction.guild_id)
         cfg["anti_invites"] = {"enabled": activar}
         self.save_settings()
-        status = "activado: eliminare invitaciones de Discord de miembros sin permiso de moderacion." if activar else "desactivado."
+        status = "activado: eliminare invitaciones y enlaces a dominios conocidos de phishing/rastreo de miembros sin permiso de moderacion." if activar else "desactivado."
         await interaction.response.send_message(f"filtro de invitaciones {status}", ephemeral=True)
         await self.security_log(interaction.guild, f"🔗 Configuracion anti-invitaciones cambiada por {interaction.user}: {status}")
 
@@ -182,7 +215,7 @@ class Seguridad(commands.Cog):
         cfg = self.settings.get(str(message.guild.id), {})
 
         invite_cfg = cfg.get("anti_invites", {})
-        if invite_cfg.get("enabled") and contains_discord_invite(message.content):
+        if invite_cfg.get("enabled") and (contains_discord_invite(message.content) or contains_suspicious_link(message.content)):
             try:
                 await message.delete()
             except (discord.Forbidden, discord.HTTPException):
@@ -191,7 +224,7 @@ class Seguridad(commands.Cog):
                 return
             await self.security_log(
                 message.guild,
-                f"🔗 Eliminada invitacion de {member} ({member.id}) en #{message.channel.name}.",
+                f"🔗 Eliminado enlace no permitido de {member} ({member.id}) en #{message.channel.name}.",
             )
             return
 
