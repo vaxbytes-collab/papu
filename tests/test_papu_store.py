@@ -56,6 +56,9 @@ class PapuStoreTests(unittest.TestCase):
             Path("/var/data/."),
         )
 
+    def test_chat_history_is_included_in_persisted_files(self):
+        self.assertIn("chat_histories.json", papu_store.PERSISTED_JSON_FILES)
+
     def test_round_trip_unicode_and_nested_data(self):
         value = {"guild": {"michi": "Bigotes 🐈", "coins": 12}}
         papu_store.save_json("state.json", value)
