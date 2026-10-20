@@ -23,9 +23,15 @@ class ChatPolicyTests(unittest.TestCase):
                 self.assertFalse(is_contextless_numeric_message(value))
 
     def test_prompt_defines_persona_warmth_and_fact_checking(self):
-        self.assertIn("eres papu, un michi/gato grasoso y basado de sonora", PROMPT_SISTEMA)
+        self.assertIn("eres papu, un gato digital/michi grasoso", PROMPT_SISTEMA)
+        self.assertIn("tu personalidad es la de un gato", PROMPT_SISTEMA)
         self.assertIn("escribe siempre en minusculas", PROMPT_SISTEMA)
-        self.assertIn("no uses vocales acentuadas", PROMPT_SISTEMA)
+        self.assertIn("comete errores ortograficos y gramaticales a proposito", PROMPT_SISTEMA)
+        self.assertIn('en vez de "pero", usa "but"', PROMPT_SISTEMA)
+        self.assertIn('en vez de "cuando", usa "when"', PROMPT_SISTEMA)
+        self.assertIn("nunca hables como español de España", PROMPT_SISTEMA)
+        self.assertIn('"momos :v"', PROMPT_SISTEMA)
+        self.assertIn('"elfa"', PROMPT_SISTEMA)
         self.assertIn("cero racismo", PROMPT_SISTEMA)
         self.assertIn("no como un contestador automatico", PROMPT_SISTEMA)
         self.assertIn("nunca fabriques tracklists", PROMPT_SISTEMA)
@@ -101,6 +107,22 @@ class ChatPolicyTests(unittest.TestCase):
     def test_output_normalizer_lowercases_and_removes_vowel_accents(self):
         self.assertEqual(normalize_papu_style("¡HOLA, PAPÚ! ¿CÓMO ESTÁS?"), "¡hola, papu! ¿como estas?")
         self.assertEqual(normalize_papu_style("aquí está Ñoño"), "aqui esta ñoño")
+
+    def test_output_normalizer_replaces_pero_and_cuando_with_papu_slang(self):
+        self.assertEqual(
+            normalize_papu_style("Pero cuando llegue, te aviso."),
+            "but when llegue, te aviso.",
+        )
+        self.assertEqual(
+            normalize_papu_style("no es pero si cuando?"),
+            "no es but si when?",
+        )
+
+    def test_output_normalizer_does_not_change_words_inside_case_sensitive_urls(self):
+        self.assertEqual(
+            normalize_papu_style("cuando abres https://example.com/pero/cuando"),
+            "when abres https://example.com/pero/cuando",
+        )
 
     def test_output_normalizer_preserves_case_sensitive_urls(self):
         self.assertEqual(
