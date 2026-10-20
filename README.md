@@ -1,6 +1,6 @@
 # Papu 🐈
 
-Bot modular de Discord para PapuCollective: moderacion segura, comunidad, organizacion, minijuegos y mascota virtual persistente.
+Bot modular de Discord para PapuCollective: moderacion segura, comunidad, organizacion, minijuegos y mascota virtual persistente, con un sistema visual compartido.
 
 ## Modulos
 
@@ -10,6 +10,7 @@ Bot modular de Discord para PapuCollective: moderacion segura, comunidad, organi
 - `utilidades.py`: recordatorios, encuestas, eventos, sugerencias, sorteos e informacion del servidor.
 - `juegos.py`: minijuegos y mascota virtual con monedas, comida, energia y felicidad.
 - `papu_store.py`: almacenamiento PostgreSQL con respaldo local JSON y migracion segura.
+- `papu_ui.py`: paleta, embeds con marca, mensajes de estado y componentes visuales compartidos.
 - `tests/`: pruebas unitarias del almacenamiento.
 
 ## Requisitos y ejecucion
@@ -108,6 +109,10 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 - `/ppt`, `/dado`, `/moneda`, `/8ball`, `/trivia`.
 - `/arcade adivinanza`, `/arcade dado_personalizado caras`, `/arcade dato_michi`, `/arcade reto_sano`, `/arcade palabra_aleatoria`, `/arcade duelo`, `/arcade completa_frase`.
 - `/michi_adoptar [nombre]`, `/michi`, `/michi_cuidar`, `/michi_comida`, `/michi_jugar`.
+
+## Identidad visual de Papu
+
+Los comandos que muestran tarjetas usan `papu_ui.py` para mantener una paleta consistente, pies de página de PapuCollective, marcas de tiempo y mensajes de estado. El panel de Michi usa barras visuales para hambre, energía y felicidad; seguridad y moderación comparten el mismo estilo de embeds. Las respuestas conversacionales de la IA siguen siendo mensajes normales para que el chat no se convierta en una sucesión de tarjetas.
 
 ## Persistencia
 

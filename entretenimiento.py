@@ -1,5 +1,6 @@
 import random
 import discord
+from papu_ui import branded_embed
 from discord import app_commands
 from discord.ext import commands
 
@@ -21,7 +22,8 @@ class Entretenimiento(commands.Cog):
             "when abres el server y ves pura gente basada :v",
             "un gran poder conlleva una gran responsabilidad :v"
         ]
-        await interaction.response.send_message(random.choice(momos))
+        embed = branded_embed(title="🐈‍⬛ Momo del día", description=random.choice(momos), color=0xA78BFA, footer="Papu Arcade • Humor")
+        await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
     @app_commands.command(name="chiste", description="Cuenta un chiste sano y apto para todos")
     async def chiste(self, interaction: discord.Interaction):
@@ -31,11 +33,12 @@ class Entretenimiento(commands.Cog):
             "— ¿Qué hace una abeja en el gimnasio? — ¡Zum-ba! :v",
             "— ¿Qué le dice un jaguar a otro jaguar? — Jagua yu :v"
         ]
-        await interaction.response.send_message(random.choice(chistes))
+        embed = branded_embed(title="😂 Chiste del michi", description=random.choice(chistes), color=0xFDBA74, footer="Papu Arcade • Humor")
+        await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
     @app_commands.command(name="avatar", description="Muestra el avatar en alta definición de un usuario")
     async def avatar(self, interaction: discord.Interaction, usuario: discord.Member):
-        embed = discord.Embed(title=f"Avatar de {usuario.name} :v", color=discord.Color.blue())
+        embed = branded_embed(title=f"🖼️ Avatar de {discord.utils.escape_mentions(usuario.display_name)}", description="Vista ampliada del avatar del miembro.", color=discord.Color.blue(), footer="Papu Community • Perfil")
         embed.set_image(url=usuario.avatar.url if usuario.avatar else usuario.default_avatar.url)
         await interaction.response.send_message(embed=embed)
 
@@ -54,10 +57,11 @@ class Entretenimiento(commands.Cog):
             ("Tener un boton para encontrar cualquier objeto perdido", "Tener un boton para recordar cualquier contrasena sin verla"),
         ]
         a, b = random.choice(dilemas)
-        embed = discord.Embed(
-            title="🤔 dilema papu",
-            description=f"**A)** {a}\n\n**B)** {b}\n\n*elige sabiamente, papu :v*",
+        embed = branded_embed(
+            title="🤔 Dilema de Papu",
+            description=f"### Opción A\n{a}\n\n### Opción B\n{b}\n\n*¿Cuál eliges, papu? :v*",
             color=discord.Color.blurple(),
+            footer="Papu Arcade • Dilema",
         )
         await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
@@ -75,10 +79,11 @@ class Entretenimiento(commands.Cog):
             "el verdadero lujo es una manta calentita y cero notificaciones.",
             "no todos los dias son legendarios. hasta los michis tienen dias de mirar la pared.",
         ]
-        embed = discord.Embed(
-            title="🐈 palabra del michi",
+        embed = branded_embed(
+            title="🐈 Consejo del michi",
             description=random.choice(frases),
             color=discord.Color.gold(),
+            footer="Papu Arcade • Sabiduría gatuna",
         )
         await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
@@ -97,16 +102,19 @@ class Entretenimiento(commands.Cog):
             ("vuelo sin alas y lloro sin ojos. ¿que soy?", "una nube"),
         ]
         riddle, answer = random.choice(items)
-        embed = discord.Embed(
-            title="🧩 adivinanza papu",
-            description=f"{riddle}\n\nrespuesta: ||{answer}||",
+        embed = branded_embed(
+            title="🧩 Adivinanza",
+            description=f"{riddle}\n\n**Respuesta:** ||{answer}||",
             color=discord.Color.blurple(),
+            footer="Papu Arcade • Respuesta oculta",
         )
         await interaction.response.send_message(embed=embed)
 
     @arcade.command(name="dado_personalizado", description="Tira un dado con el maximo que tu elijas")
     async def dado_personalizado(self, interaction: discord.Interaction, caras: app_commands.Range[int, 2, 1000] = 20):
-        await interaction.response.send_message(f"🎲 dado de 1 a {caras}: **{random.randint(1, caras)}** :v")
+        result = random.randint(1, caras)
+        embed = branded_embed(title="🎲 Dado personalizado", description=f"**Resultado**\n# {result}\n\nRango: 1–{caras}", color=0x67E8F9, footer="Papu Arcade • Resultado aleatorio")
+        await interaction.response.send_message(embed=embed)
 
     @arcade.command(name="dato_michi", description="Un dato curioso sobre gatos")
     async def dato_michi(self, interaction: discord.Interaction):
@@ -120,7 +128,8 @@ class Entretenimiento(commands.Cog):
             "el juego de caza simulado ayuda a los gatos a practicar conductas naturales.",
             "los gatos pueden aprender rutinas y anticipar eventos diarios.",
         ]
-        await interaction.response.send_message(f"🐈 dato michi: {random.choice(facts)}")
+        embed = branded_embed(title="🐈 Dato michi", description=random.choice(facts), color=0xFDBA74, footer="Papu Arcade • Curiosidades")
+        await interaction.response.send_message(embed=embed)
 
     @arcade.command(name="reto_sano", description="Un reto opcional y sin riesgo para el servidor")
     async def reto_sano(self, interaction: discord.Interaction):
@@ -136,19 +145,24 @@ class Entretenimiento(commands.Cog):
             "describe tu meme favorito sin enlazarlo; que el chat lo adivine.",
             "crea el nombre de una ciudad donde solo vivan gatos.",
         ]
-        await interaction.response.send_message(f"🎯 reto opcional: {random.choice(challenges)}")
+        embed = branded_embed(title="🎯 Reto opcional", description=random.choice(challenges), color=0xA78BFA, footer="Papu Arcade • Participación voluntaria")
+        await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
     @arcade.command(name="palabra_aleatoria", description="Te da una palabra al azar para escribir o dibujar")
     async def palabra_aleatoria(self, interaction: discord.Interaction):
         words = ["laberinto", "cometa", "paraguas", "reliquia", "pixel", "tormenta", "cafetera", "saturno", "fantasma", "brujula", "ferrocarril", "caramelo", "glaciar", "cassette", "misterio", "semilla", "nublado", "ascensor", "recreo", "paradoja"]
-        await interaction.response.send_message(f"📝 palabra aleatoria: **{random.choice(words)}**")
+        word = random.choice(words)
+        embed = branded_embed(title="📝 Palabra aleatoria", description=f"# {word}\n\n*Úsala como inspiración para escribir, dibujar o inventar algo.*", color=0x67E8F9, footer="Papu Arcade • Creatividad")
+        await interaction.response.send_message(embed=embed)
 
     @arcade.command(name="duelo", description="Genera un duelo absurdo entre dos cosas")
     async def duelo_aleatorio(self, interaction: discord.Interaction):
         things = ["un michi con wifi", "una tostadora gamer", "un pato con corbata", "la calculadora del colegio", "un robot que solo dice miau", "una papa interdimensional", "un ventilador dramatico", "un dinosaurio con patines", "un modem legendario", "una silla que cruje"]
         a, b = random.sample(things, 2)
         winner = random.choice([a, b])
-        await interaction.response.send_message(f"🥊 **{a} VS {b}**\nveredicto cientificamente inventado: gana **{winner}**.")
+        embed = branded_embed(title="🥊 Duelo absurdo", description=f"### {a}\n## VS\n### {b}", color=0xA78BFA, footer="Papu Arcade • Ciencia completamente inventada")
+        embed.add_field(name="🏆 Ganador", value=f"**{winner}**", inline=False)
+        await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
     @arcade.command(name="completa_frase", description="Completa una frase meme de forma aleatoria")
     async def completa_frase(self, interaction: discord.Interaction):
@@ -161,4 +175,5 @@ class Entretenimiento(commands.Cog):
             ("yo: hoy si me organizo...", "...mi calendario riendose en binario."),
         ]
         a, b = random.choice(beginnings)
-        await interaction.response.send_message(f"🧩 {a}\n{b}")
+        embed = branded_embed(title="🧩 Completa la frase", description=f"**{a}**\n\n{b}", color=0xA78BFA, footer="Papu Arcade • Humor")
+        await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())

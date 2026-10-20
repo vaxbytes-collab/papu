@@ -14,6 +14,7 @@ from discord.ext import commands
 from groq_config import get_groq_model
 from papu_store import DATA_DIR, load_json as load_stored_json, save_json as save_stored_json
 from moderation_cases import make_case_content, next_case_id
+from papu_ui import branded_embed, send_feedback
 
 LOGS_FILE = DATA_DIR / "log_channels.json"
 WARNS_FILE = DATA_DIR / "warns.json"
@@ -37,14 +38,12 @@ def safe_text(value, limit=900):
 
 
 def make_embed(title, description, color=discord.Color.blurple()):
-    embed = discord.Embed(
+    return branded_embed(
         title=safe_text(title, 240),
         description=safe_text(description, 3900),
         color=color,
-        timestamp=discord.utils.utcnow(),
+        footer="Registro de moderación",
     )
-    embed.set_footer(text="PapuCollective • registro de moderacion")
-    return embed
 
 
 class Moderacion(commands.Cog):
@@ -263,7 +262,7 @@ class Moderacion(commands.Cog):
             )
         self.log_channels[self.guild_key(interaction.guild)] = canal.id
         save_json(LOGS_FILE, self.log_channels)
-        await interaction.response.send_message(f"listo papu, los logs se enviaran a {canal.mention}.", ephemeral=True)
+        await send_feedback(interaction, f"Los registros se enviarán a {canal.mention}.", title="Canal de registros configurado", tone="success")
         await self.log(interaction.guild, "⚙️ Canal de logs configurado", f"Canal asignado: {canal.mention}")
 
     @app_commands.command(name="logconfig", description="Comprueba el canal de registros configurado")
@@ -271,10 +270,7 @@ class Moderacion(commands.Cog):
     async def logconfig(self, interaction: discord.Interaction):
         channel_id = self.log_channels.get(self.guild_key(interaction.guild))
         channel = interaction.guild.get_channel(int(channel_id)) if channel_id else None
-        await interaction.response.send_message(
-            f"📋 Canal de logs: {channel.mention if channel else 'sin configurar o eliminado'}",
-            ephemeral=True,
-        )
+        await send_feedback(interaction, f"Canal de registros: {channel.mention if channel else 'sin configurar o eliminado'}.", title="Configuración de registros", tone="info")
 
     @app_commands.command(name="aimoderacion", description="Activa o desactiva alertas de moderacion por IA")
     @app_commands.checks.has_permissions(administrator=True)
@@ -317,11 +313,12 @@ class Moderacion(commands.Cog):
         extras = []
         if activar and not getattr(self.bot, "groq_client", None):
             extras.append("Falta GROQ_API_KEY; sin ella no se analizaran mensajes.")
-        await interaction.response.send_message(
-            f"moderacion IA {state}. Los casos de gravedad 3, confianza >=95% y categoria sexual/amenaza/odio/acoso pueden borrar el mensaje y aplicar timeout de 24 horas. "
-            "Los casos menos concluyentes solo se registran; no se expulsa ni banea automaticamente. "
+        await send_feedback(
+            interaction,
+            f"Moderación IA {state}. Los casos de gravedad 3, confianza ≥95 % y categoría sexual/amenaza/odio/acoso pueden intentar eliminar el mensaje y aplicar timeout de 24 horas. Los casos menos concluyentes se registran para revisión humana; no se banea ni expulsa automáticamente. "
             + " ".join(extras),
-            ephemeral=True,
+            title="Moderación IA",
+            tone="success" if activar else "warning",
         )
         await self.log(interaction.guild, "Configuracion de moderacion IA",
             f"Alertas: {state}. Acciones en vivo: {'activadas' if activar else 'desactivadas'}.")
@@ -410,7 +407,7 @@ class Moderacion(commands.Cog):
             return await interaction.response.send_message("no puedes moderar a alguien con rol igual o superior.", ephemeral=True)
         try:
             await usuario.kick(reason=f"{interaction.user} ({interaction.user.id}): {razon[:400]}")
-            await interaction.response.send_message(f"👢 {usuario} fue expulsado. Motivo: {safe_text(razon, 400)}", ephemeral=True)
+            await send_feedback(interaction, f"**Miembro:** {usuario.mention}\n**Motivo:** {safe_text(razon, 400)}", title="Expulsión aplicada", tone="success")
             await self.log(interaction.guild, "👢 Usuario expulsado", f"Usuario: {usuario} ({usuario.id})\nStaff: {interaction.user}\nMotivo: {safe_text(razon)}", discord.Color.red())
         except discord.Forbidden:
             await interaction.response.send_message("discord rechazo la accion; revisa permisos y jerarquia.", ephemeral=True)
@@ -425,7 +422,7 @@ class Moderacion(commands.Cog):
             return await interaction.response.send_message("no puedes moderar a alguien con rol igual o superior.", ephemeral=True)
         try:
             await usuario.ban(reason=f"{interaction.user} ({interaction.user.id}): {razon[:400]}", delete_message_seconds=0)
-            await interaction.response.send_message(f"🔨 {usuario} fue baneado. Motivo: {safe_text(razon, 400)}", ephemeral=True)
+            await send_feedback(interaction, f"**Miembro:** {usuario.mention}\n**Motivo:** {safe_text(razon, 400)}", title="Baneo aplicado", tone="success")
             await self.log(interaction.guild, "🔨 Usuario baneado", f"Usuario: {usuario} ({usuario.id})\nStaff: {interaction.user}\nMotivo: {safe_text(razon)}", discord.Color.red())
         except discord.Forbidden:
             await interaction.response.send_message("discord rechazo la accion; revisa permisos y jerarquia.", ephemeral=True)
@@ -437,7 +434,7 @@ class Moderacion(commands.Cog):
         try:
             user = await self.bot.fetch_user(int(user_id))
             await interaction.guild.unban(user, reason=f"Solicitado por {interaction.user}")
-            await interaction.response.send_message(f"🔓 {user} fue desbaneado.", ephemeral=True)
+            await send_feedback(interaction, f"Se retiró el veto de **{user}**.", title="Desbaneo completado", tone="success")
             await self.log(interaction.guild, "🔓 Usuario desbaneado", f"Usuario: {user} ({user.id})\nStaff: {interaction.user}")
         except (ValueError, discord.NotFound):
             await interaction.response.send_message("ID invalida o usuario no baneado.", ephemeral=True)
@@ -454,7 +451,7 @@ class Moderacion(commands.Cog):
             return await interaction.response.send_message("no puedes moderar a alguien con rol igual o superior.", ephemeral=True)
         try:
             await usuario.timeout(discord.utils.utcnow() + timedelta(minutes=minutos), reason=f"{interaction.user}: {razon[:400]}")
-            await interaction.response.send_message(f"🤐 {usuario.mention} recibio timeout por {minutos} min.", ephemeral=True)
+            await send_feedback(interaction, f"**Miembro:** {usuario.mention}\n**Duración:** {minutos} minutos", title="Timeout aplicado", tone="success")
             await self.log(interaction.guild, "🤐 Timeout aplicado", f"Usuario: {usuario} ({usuario.id})\nStaff: {interaction.user}\nDuracion: {minutos} min\nMotivo: {safe_text(razon)}", discord.Color.orange())
         except discord.Forbidden:
             await interaction.response.send_message("no tengo permisos o el rol del usuario esta por encima.", ephemeral=True)
@@ -464,7 +461,7 @@ class Moderacion(commands.Cog):
     async def untimeout(self, interaction: discord.Interaction, usuario: discord.Member):
         try:
             await usuario.timeout(None, reason=f"Retirado por {interaction.user}")
-            await interaction.response.send_message(f"🔊 Se retiro el timeout de {usuario.mention}.", ephemeral=True)
+            await send_feedback(interaction, f"Se retiró el timeout de {usuario.mention}.", title="Timeout retirado", tone="success")
             await self.log(interaction.guild, "🔊 Timeout retirado", f"Usuario: {usuario} ({usuario.id})\nStaff: {interaction.user}")
         except discord.Forbidden:
             await interaction.response.send_message("no tengo permisos para retirar el timeout.", ephemeral=True)
@@ -479,7 +476,7 @@ class Moderacion(commands.Cog):
         })
         save_json(WARNS_FILE, self.warns)
         total = len(self.warns[guild_key][user_key])
-        await interaction.response.send_message(f"⚠️ {usuario.mention} recibio una advertencia. Total: {total}.", ephemeral=True)
+        await send_feedback(interaction, f"**Miembro:** {usuario.mention}\n**Total de advertencias:** {total}\n**Motivo:** {safe_text(razon, 400)}", title="Advertencia registrada", tone="warning")
         await self.log(interaction.guild, "⚠️ Advertencia aplicada", f"Usuario: {usuario} ({usuario.id})\nStaff: {interaction.user}\nTotal: {total}\nMotivo: {safe_text(razon)}", discord.Color.orange())
 
     @app_commands.command(name="warns", description="Consulta las advertencias")
@@ -521,12 +518,18 @@ class Moderacion(commands.Cog):
         settings = self.settings.get(key, {})
         channel_id = self.log_channels.get(key)
         channel = interaction.guild.get_channel(int(channel_id)) if channel_id else None
-        embed = make_embed("🩺 Diagnóstico de Papu",
-            f"IA de moderación: {'activada' if settings.get('ai_enabled') else 'desactivada'}\\n"
-            f"Groq disponible: {'sí' if getattr(self.bot, 'groq_client', None) else 'no'}\\n"
-            f"Canal de logs: {channel.mention if channel else 'sin configurar'}\\n"
-            f"Canal de chat sin mención: {'configurado' if settings.get('chat_channel') else 'desactivado'}",
-            discord.Color.green() if channel and getattr(self.bot, 'groq_client', None) else discord.Color.orange())
+        groq_ready = bool(getattr(self.bot, "groq_client", None))
+        embed = branded_embed(
+            title="🩺 Diagnóstico de Papu",
+            description="Estado general de la configuración del servidor.",
+            color=discord.Color.green() if channel and groq_ready else discord.Color.orange(),
+            footer="Diagnóstico • PapuCollective",
+        )
+        embed.add_field(name="🤖 Moderación IA", value="🟢 Activada" if settings.get("ai_enabled") else "⚪ Desactivada", inline=True)
+        embed.add_field(name="✨ Proveedor de IA", value="🟢 Disponible" if groq_ready else "🔴 Sin configurar", inline=True)
+        embed.add_field(name="📋 Canal de logs", value=channel.mention if channel else "⚠️ Sin configurar", inline=False)
+        chat_channel = interaction.guild.get_channel(int(settings.get("chat_channel", 0))) if settings.get("chat_channel") else None
+        embed.add_field(name="💬 Chat sin mención", value=chat_channel.mention if chat_channel else "⚪ Desactivado", inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="clearwarns", description="Borra las advertencias de un usuario")
@@ -536,7 +539,7 @@ class Moderacion(commands.Cog):
         count = len(self.warns.get(key, {}).get(user_key, []))
         self.warns.get(key, {}).pop(user_key, None)
         save_json(WARNS_FILE, self.warns)
-        await interaction.response.send_message(f"🧹 Se borraron {count} advertencias de {usuario.mention}.", ephemeral=True)
+        await send_feedback(interaction, f"Se retiraron {count} advertencia(s) de {usuario.mention}.", title="Advertencias eliminadas", tone="success")
         await self.log(interaction.guild, "🧹 Advertencias borradas", f"Usuario: {usuario} ({usuario.id})\nStaff: {interaction.user}\nCantidad: {count}")
 
     @app_commands.command(name="purge", description="Borra de 1 a 100 mensajes recientes")
@@ -553,7 +556,7 @@ class Moderacion(commands.Cog):
     @app_commands.checks.bot_has_permissions(manage_channels=True)
     async def slowmode(self, interaction: discord.Interaction, segundos: app_commands.Range[int, 0, 21600]):
         await interaction.channel.edit(slowmode_delay=segundos, reason=f"Solicitado por {interaction.user}")
-        await interaction.response.send_message(f"⏱️ Modo lento ajustado a {segundos} segundos.", ephemeral=True)
+        await send_feedback(interaction, f"Nuevo intervalo: **{segundos} segundos**.", title="Modo lento actualizado", tone="success")
         await self.log(interaction.guild, "⏱️ Modo lento cambiado", f"Staff: {interaction.user}\nCanal: {interaction.channel.mention}\nSegundos: {segundos}")
 
     @app_commands.command(name="lock", description="Bloquea el canal actual")
@@ -561,7 +564,7 @@ class Moderacion(commands.Cog):
     @app_commands.checks.bot_has_permissions(manage_channels=True)
     async def lock(self, interaction: discord.Interaction):
         await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=False, reason=f"Bloqueado por {interaction.user}")
-        await interaction.response.send_message("🔒 Canal bloqueado.", ephemeral=True)
+        await send_feedback(interaction, "El canal quedó bloqueado para los miembros afectados por los permisos.", title="Canal bloqueado", tone="warning")
         await self.log(interaction.guild, "🔒 Canal bloqueado", f"Staff: {interaction.user}\nCanal: {interaction.channel.mention}", discord.Color.orange())
 
     @app_commands.command(name="unlock", description="Desbloquea el canal actual")
@@ -569,7 +572,7 @@ class Moderacion(commands.Cog):
     @app_commands.checks.bot_has_permissions(manage_channels=True)
     async def unlock(self, interaction: discord.Interaction):
         await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=None, reason=f"Desbloqueado por {interaction.user}")
-        await interaction.response.send_message("🔓 Canal desbloqueado; se heredan los permisos de categoria.", ephemeral=True)
+        await send_feedback(interaction, "El canal vuelve a heredar los permisos de su categoría.", title="Canal desbloqueado", tone="success")
         await self.log(interaction.guild, "🔓 Canal desbloqueado", f"Staff: {interaction.user}\nCanal: {interaction.channel.mention}")
 
 

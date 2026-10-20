@@ -5,6 +5,7 @@ import time
 from datetime import datetime, timezone
 
 import discord
+from papu_ui import branded_embed, send_feedback
 from discord import app_commands
 from discord.ext import commands, tasks
 
@@ -58,7 +59,7 @@ class Utilidades(commands.Cog):
                                "channel_id": interaction.channel_id, "text": str(texto),
                                "due": time.time() + minutos * 60})
         save_json("reminders.json", self.reminders)
-        await interaction.response.send_message(f"⏰ Te aviso en {minutos} minutos. Recordatorio guardado.", ephemeral=True)
+        await send_feedback(interaction, f"Te avisaré en **{minutos} minutos**.\n**Recordatorio:** {discord.utils.escape_mentions(texto)}", title="Recordatorio programado", tone="success")
 
     @app_commands.command(name="encuesta", description="Crea una encuesta con hasta cuatro opciones")
     async def encuesta(self, interaction: discord.Interaction, pregunta: app_commands.Range[str, 1, 180],
@@ -68,10 +69,10 @@ class Utilidades(commands.Cog):
         options = [x.strip() for x in (opcion_a, opcion_b, opcion_c, opcion_d) if x and x.strip()]
         if len(options) < 2 or len(set(options)) != len(options):
             return await interaction.response.send_message("Pon al menos dos opciones distintas.", ephemeral=True)
-        embed = discord.Embed(title=f"📊 {pregunta}", color=discord.Color.blurple())
+        embed = branded_embed(title=f"📊 {pregunta}", color=discord.Color.blurple())
         marks = ["🇦", "🇧", "🇨", "🇩"]
         embed.description = "\n".join(f"{marks[i]} {discord.utils.escape_mentions(value)}" for i, value in enumerate(options))
-        embed.set_footer(text=f"Encuesta de {interaction.user.display_name}")
+        embed.set_footer(text=f"Encuesta de {interaction.user.display_name} • PapuCollective")
         await interaction.response.send_message(embed=embed)
         message = await interaction.original_response()
         for mark in marks[:len(options)]:
@@ -95,9 +96,9 @@ class Utilidades(commands.Cog):
         self.events.setdefault(key, []).append({"name": nombre, "date": dt.isoformat(),
             "details": detalles, "creator": interaction.user.id})
         save_json("events.json", self.events)
-        embed = discord.Embed(title=f"📅 {nombre}", description=detalles, color=discord.Color.green())
+        embed = branded_embed(title=f"📅 {discord.utils.escape_markdown(nombre)}", description=discord.utils.escape_mentions(detalles), color=discord.Color.green(), footer="Papu Community • Evento")
         embed.add_field(name="Fecha", value=discord.utils.format_dt(dt, "F"))
-        embed.set_footer(text=f"Organizado por {interaction.user.display_name}")
+        embed.set_footer(text=f"Organizado por {interaction.user.display_name} • PapuCollective")
         await interaction.response.send_message(embed=embed)
         msg = await interaction.original_response()
         await msg.add_reaction("🎉")
@@ -107,9 +108,20 @@ class Utilidades(commands.Cog):
         entries = self.events.get(str(interaction.guild_id), [])
         if not entries:
             return await interaction.response.send_message("Todavia no hay eventos guardados.", ephemeral=True)
-        embed = discord.Embed(title="📅 Agenda de Papu", color=discord.Color.green())
+        embed = branded_embed(title="📅 Agenda de Papu", description=f"Próximos eventos guardados: **{len(entries)}**", color=discord.Color.green(), footer="Papu Community • Agenda")
         for item in entries[-10:]:
-            embed.add_field(name=item["name"][:200], value=f"{item['date']}\n{item['details'][:500]}", inline=False)
+            try:
+                event_dt = datetime.fromisoformat(str(item["date"]).replace("Z", "+00:00"))
+                date_label = discord.utils.format_dt(event_dt, "F")
+                relative_label = discord.utils.format_dt(event_dt, "R")
+            except (ValueError, TypeError):
+                date_label = str(item.get("date", "Fecha no disponible"))
+                relative_label = ""
+            details = str(item.get("details", "")).strip()
+            value = f"🕒 {date_label}" + (f" · {relative_label}" if relative_label else "")
+            if details:
+                value += f"\n{details[:500]}"
+            embed.add_field(name=f"📌 {str(item.get('name', 'Evento'))[:190]}", value=value, inline=False)
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="sugerencia", description="Envía una sugerencia al canal configurado")
@@ -118,14 +130,14 @@ class Utilidades(commands.Cog):
         target = interaction.guild.get_channel(int(target_id)) if target_id else None
         if not isinstance(target, discord.TextChannel):
             return await interaction.response.send_message("El staff debe configurar el canal con /canal_sugerencias.", ephemeral=True)
-        embed = discord.Embed(title="💡 Nueva sugerencia", description=discord.utils.escape_mentions(texto), color=discord.Color.gold())
-        embed.set_footer(text=f"Autor ID: {interaction.user.id}")
+        embed = branded_embed(title="💡 Nueva sugerencia", description=discord.utils.escape_mentions(texto), color=discord.Color.gold(), footer="Papu Community • Propuesta")
+        embed.set_footer(text=f"Sugerencia de {interaction.user.display_name} • PapuCollective")
         msg = await target.send(embed=embed)
         await msg.add_reaction("👍")
         await msg.add_reaction("👎")
         self.suggestions[str(msg.id)] = {"guild_id": interaction.guild_id, "author_id": interaction.user.id, "text": texto}
         save_json("suggestions.json", self.suggestions)
-        await interaction.response.send_message("Sugerencia enviada. ¡Gracias por aportar!", ephemeral=True)
+        await send_feedback(interaction, "La sugerencia se publicó y ya puede recibir votos de la comunidad.", title="Sugerencia enviada", tone="success")
 
     @app_commands.command(name="canal_sugerencias", description="Configura el canal de sugerencias")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -135,7 +147,7 @@ class Utilidades(commands.Cog):
             return await interaction.response.send_message("Necesito ver el canal, enviar embeds y añadir reacciones.", ephemeral=True)
         self.guild_settings(interaction.guild_id)["suggestion_channel"] = canal.id
         save_json("utility_settings.json", self.settings)
-        await interaction.response.send_message(f"Canal de sugerencias: {canal.mention}", ephemeral=True)
+        await send_feedback(interaction, f"Las sugerencias se publicarán en {canal.mention}.", title="Canal de sugerencias configurado", tone="success")
 
     @app_commands.command(name="sorteo", description="Elige al azar entre usuarios mencionados")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -157,11 +169,14 @@ class Utilidades(commands.Cog):
         guild = interaction.guild
         if guild is None:
             return await interaction.response.send_message("Este comando solo funciona en un servidor.", ephemeral=True)
-        embed = discord.Embed(title=guild.name, color=discord.Color.blurple())
-        embed.add_field(name="Miembros", value=str(guild.member_count or "No disponible"))
-        embed.add_field(name="Canales", value=str(len(guild.channels)))
-        embed.add_field(name="Roles", value=str(len(guild.roles)))
-        embed.add_field(name="Creado", value=discord.utils.format_dt(guild.created_at, "D"))
+        embed = branded_embed(title=guild.name, color=discord.Color.blurple())
+        embed.description = "Resumen de la comunidad"
+        embed.add_field(name="👥 Miembros", value=f"**{guild.member_count or 'No disponible'}**", inline=True)
+        embed.add_field(name="💬 Canales", value=f"**{len(guild.channels)}**", inline=True)
+        embed.add_field(name="🎭 Roles", value=f"**{len(guild.roles)}**", inline=True)
+        embed.add_field(name="📅 Creado", value=discord.utils.format_dt(guild.created_at, "D"), inline=False)
+        if guild.owner:
+            embed.add_field(name="👑 Propietario", value=discord.utils.escape_mentions(guild.owner.display_name), inline=True)
         if guild.icon:
             embed.set_thumbnail(url=guild.icon.url)
         await interaction.response.send_message(embed=embed)
@@ -169,31 +184,35 @@ class Utilidades(commands.Cog):
     @app_commands.command(name="userinfo", description="Información pública de un miembro")
     async def userinfo(self, interaction: discord.Interaction, usuario: discord.Member = None):
         usuario = usuario or interaction.user
-        embed = discord.Embed(title=f"Perfil de {usuario.display_name}", color=discord.Color.blurple())
-        embed.add_field(name="Cuenta", value=discord.utils.format_dt(usuario.created_at, "D"))
+        embed = branded_embed(title=f"👤 Perfil de {discord.utils.escape_mentions(usuario.display_name)}", description="Información de la cuenta en este servidor.", color=discord.Color.blurple(), footer="Papu Community • Perfil")
+        embed.add_field(name="🗓️ Cuenta creada", value=discord.utils.format_dt(usuario.created_at, "D"), inline=True)
         if usuario.joined_at:
-            embed.add_field(name="Entró al servidor", value=discord.utils.format_dt(usuario.joined_at, "D"))
-        embed.add_field(name="ID", value=str(usuario.id))
+            embed.add_field(name="📥 Entró al servidor", value=discord.utils.format_dt(usuario.joined_at, "D"), inline=True)
+        embed.add_field(name="🆔 ID", value=f"`{usuario.id}`", inline=False)
         embed.set_thumbnail(url=usuario.display_avatar.url)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="ping", description="Comprueba la latencia de Papu")
     async def ping(self, interaction: discord.Interaction):
-        await interaction.response.send_message(f"🏓 Pong: {round(self.bot.latency * 1000)} ms")
+        latency = round(self.bot.latency * 1000)
+        tone = "success" if latency < 180 else "warning" if latency < 350 else "error"
+        await send_feedback(interaction, f"Latencia de Papu: **{latency} ms**.", title="Conexión comprobada", tone=tone, ephemeral=False)
 
     @app_commands.command(name="elegir", description="Papu elige una opcion por ti")
     async def elegir(self, interaction: discord.Interaction, opciones: app_commands.Range[str, 3, 500]):
         choices = [x.strip() for x in opciones.split("|") if x.strip()]
         if len(choices) < 2:
             return await interaction.response.send_message("Separa al menos dos opciones con |.", ephemeral=True)
-        await interaction.response.send_message(f"🎲 Papu elige: **{discord.utils.escape_mentions(random.choice(choices))}**")
+        choice = discord.utils.escape_mentions(random.choice(choices))
+        embed = branded_embed(title="🎲 Papu elige", description=f"# {choice}", color=0xA78BFA, footer=f"Selección de {interaction.user.display_name}")
+        await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
     @app_commands.command(name="config_papu", description="Muestra configuraciones comunitarias")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def config_papu(self, interaction: discord.Interaction):
         cfg = self.guild_settings(interaction.guild_id)
         channel = interaction.guild.get_channel(int(cfg["suggestion_channel"])) if cfg.get("suggestion_channel") else None
-        await interaction.response.send_message(f"Canal de sugerencias: {channel.mention if channel else 'sin configurar'}", ephemeral=True)
+        await send_feedback(interaction, f"Canal de sugerencias: {channel.mention if channel else 'sin configurar'}.", title="Configuración de comunidad", tone="info")
 
 
     def afk_key(self, guild_id, user_id):
@@ -261,7 +280,7 @@ class Utilidades(commands.Cog):
     @app_commands.command(name="rolinfo", description="Muestra informacion de un rol del servidor")
     @app_commands.guild_only()
     async def rolinfo(self, interaction: discord.Interaction, rol: discord.Role):
-        embed = discord.Embed(title=f"🎭 Rol: {rol.name}", color=rol.color or discord.Color.blurple())
+        embed = branded_embed(title=f"🎭 Rol: {discord.utils.escape_markdown(rol.name)}", description="Ficha informativa del rol.", color=rol.color or discord.Color.blurple(), footer="Papu Community • Roles")
         embed.add_field(name="ID", value=str(rol.id), inline=True)
         embed.add_field(name="Miembros", value=str(len(rol.members)), inline=True)
         embed.add_field(name="Posicion", value=str(rol.position), inline=True)
@@ -270,13 +289,13 @@ class Utilidades(commands.Cog):
         embed.add_field(name="Permisos", value="administrador" if rol.permissions.administrator else
                         "gestionar servidor" if rol.permissions.manage_guild else
                         "permisos habituales", inline=True)
-        embed.set_footer(text=f"Solicitado por {interaction.user.display_name}")
+        embed.set_footer(text=f"Solicitado por {interaction.user.display_name} • PapuCollective")
         await interaction.response.send_message(embed=embed, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
 
     @app_commands.command(name="timestamp", description="Convierte una fecha Unix a formatos de Discord")
     async def timestamp(self, interaction: discord.Interaction,
                         unix: app_commands.Range[int, 0, 4102444800]):
-        embed = discord.Embed(title="🕒 Timestamp de Discord", color=discord.Color.blurple())
+        embed = branded_embed(title="🕒 Timestamp de Discord", description="Copias listas para usar en Discord.", color=discord.Color.blurple(), footer="Papu Community • Herramientas de fecha")
         embed.description = (
             f"**Vista completa:** <t:{unix}:F>\n"
             f"**Fecha corta:** <t:{unix}:d>\n"

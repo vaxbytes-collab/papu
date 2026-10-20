@@ -8,6 +8,7 @@ from datetime import timedelta
 from urllib.parse import urlparse
 
 import discord
+from papu_ui import branded_embed, send_feedback, status_label
 from discord import app_commands
 from discord.ext import commands
 
@@ -299,58 +300,37 @@ class Seguridad(commands.Cog):
         spam = cfg.get("anti_spam", {})
         raid = cfg.get("anti_raid", {})
         invites = cfg.get("anti_invites", {})
-        embed = discord.Embed(title="🛡️ Seguridad de Papu", color=discord.Color.blurple())
-        embed.add_field(
-            name="Anti-spam",
-            value=(
-                f"{'activado' if spam.get('enabled') else 'desactivado'} · "
-                f"{spam.get('limit', 6)} mensajes / {spam.get('window', 8)} s · "
-                f"timeout {spam.get('timeout', 60)} s"
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="Anti-raid",
-            value=(
-                f"{'activado' if raid.get('enabled') else 'desactivado'} · "
-                f"{raid.get('threshold', 8)} miembros / {raid.get('window', 10)} s · solo alertas"
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="Invitaciones / enlaces sospechosos",
-            value="bloqueo activado" if invites.get("enabled") else "bloqueo desactivado",
-            inline=False,
-        )
         mentions = cfg.get("anti_mentions", {})
-        embed.add_field(
-            name="Anti-menciones",
-            value=f"{'activado' if mentions.get('enabled') else 'desactivado'} · limite {mentions.get('limit', 4)}",
-            inline=True,
-        )
         repeat = cfg.get("anti_repeat", {})
-        embed.add_field(
-            name="Anti-repeticion",
-            value=f"{'activado' if repeat.get('enabled') else 'desactivado'} · {repeat.get('repeats', 3)} en {repeat.get('window', 12)} s",
-            inline=True,
-        )
         caps = cfg.get("caps_filter", {})
-        embed.add_field(
-            name="Filtro caps",
-            value=f"{'activado' if caps.get('enabled') else 'desactivado'} · {caps.get('percent', 85)}%",
-            inline=True,
+        keys = ("anti_spam", "anti_raid", "anti_invites", "anti_mentions", "anti_repeat", "caps_filter")
+        enabled_count = sum(bool(cfg.get(key, {}).get("enabled")) for key in keys)
+        embed = branded_embed(
+            title="🛡️ Centro de seguridad",
+            description=f"**Protecciones activas:** {enabled_count}/{len(keys)}\n*Los filtros son configurables por servidor.*",
+            color=discord.Color.blurple(),
+            footer="Papu Guard • Panel de estado",
         )
         embed.add_field(
-            name="Filtro personalizado",
-            value=f"{len(cfg.get('blocked_words', []))} palabra(s)/frase(s) configurada(s)",
-            inline=True,
+            name=f"{'🟢' if spam.get('enabled') else '⚪'} Anti-spam",
+            value=f"**{status_label(bool(spam.get('enabled')))}**\n{spam.get('limit', 6)} mensajes / {spam.get('window', 8)} s · timeout {spam.get('timeout', 60)} s",
+            inline=False,
         )
         embed.add_field(
-            name="Reportes",
-            value="canal configurado" if cfg.get("report_channel") else "sin configurar",
-            inline=True,
+            name=f"{'🟢' if raid.get('enabled') else '⚪'} Anti-raid",
+            value=f"**{status_label(bool(raid.get('enabled')))}**\n{raid.get('threshold', 8)} miembros / {raid.get('window', 10)} s · solo alertas",
+            inline=False,
         )
-        embed.set_footer(text="Configura un canal de logs con /setlogchannel para recibir alertas.")
+        embed.add_field(
+            name=f"{'🟢' if invites.get('enabled') else '⚪'} Invitaciones y enlaces",
+            value="Bloqueo activo" if invites.get("enabled") else "Bloqueo desactivado",
+            inline=False,
+        )
+        embed.add_field(name="Anti-menciones", value=f"{status_label(bool(mentions.get('enabled')))} · límite {mentions.get('limit', 4)}", inline=True)
+        embed.add_field(name="Anti-repetición", value=f"{status_label(bool(repeat.get('enabled')))} · {repeat.get('repeats', 3)} en {repeat.get('window', 12)} s", inline=True)
+        embed.add_field(name="Filtro de mayúsculas", value=f"{status_label(bool(caps.get('enabled')))} · {caps.get('percent', 85)} %", inline=True)
+        embed.add_field(name="Filtro personalizado", value=f"{len(cfg.get('blocked_words', []))} palabra(s)/frase(s) configurada(s)", inline=True)
+        embed.add_field(name="📨 Reportes", value="🟢 Canal configurado" if cfg.get("report_channel") else "⚪ Sin configurar", inline=True)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
@@ -539,7 +519,7 @@ class Seguridad(commands.Cog):
             ):
                 if not getattr(perms, attr):
                     missing.append(label)
-        embed = discord.Embed(title="🔎 Auditoria de permisos", color=discord.Color.orange() if enabled else discord.Color.green())
+        embed = branded_embed(title="🔎 Auditoria de permisos", color=discord.Color.orange() if enabled else discord.Color.green())
         embed.add_field(name="Permisos delicados de everyone", value="\n".join(f"⚠️ {item}" for item in enabled) if enabled else "No encontre permisos delicados activados para everyone.", inline=False)
         embed.add_field(name="Permisos que le faltan a Papu", value="\n".join(f"• {item}" for item in missing) if missing else "No encontre carencias generales en la lista revisada.", inline=False)
         embed.set_footer(text="Auditoria orientativa; no cambia permisos automaticamente.")
@@ -579,7 +559,7 @@ class Seguridad(commands.Cog):
         if channel is None:
             return await interaction.response.send_message("no hay canal de logs configurado; usa /setlogchannel primero.", ephemeral=True)
         await self.security_log(interaction.guild, f"prueba de logs solicitada por {interaction.user} ({interaction.user.id}).")
-        await interaction.response.send_message(f"envie una prueba a {channel.mention}.", ephemeral=True)
+        await send_feedback(interaction, f"Se envió una prueba a {channel.mention}.", title="Canal de registros verificado", tone="success")
 
     @guardia.command(name="reporte_prueba", description="Comprueba el canal de reportes sin crear una denuncia")
     @app_commands.guild_only()
@@ -596,7 +576,7 @@ class Seguridad(commands.Cog):
             )
         except (discord.Forbidden, discord.HTTPException):
             return await interaction.response.send_message("no pude escribir en el canal de reportes; revisa sus permisos.", ephemeral=True)
-        await interaction.response.send_message(f"prueba enviada a {channel.mention}.", ephemeral=True)
+        await send_feedback(interaction, f"El mensaje de prueba llegó a {channel.mention}.", title="Canal de reportes verificado", tone="success")
 
     @guardia.command(name="nota_agregar", description="Guarda una nota de moderacion interna sobre un miembro")
     @app_commands.guild_only()
@@ -628,12 +608,12 @@ class Seguridad(commands.Cog):
         for note in notes[-10:]:
             stamp = int(note.get("created_at", 0))
             lines.append(f"ID {note.get('id', '?')} - <t:{stamp}:d> - staff {note.get('author_id', '?')}\n{note.get('text', '')}")
-        embed = discord.Embed(
+        embed = branded_embed(
             title=f"Notas internas: {discord.utils.escape_mentions(usuario.display_name)}",
             description="\n\n".join(lines)[:3900],
             color=discord.Color.orange(),
         )
-        embed.set_footer(text="Solo para revision del staff; no guardes datos sensibles innecesarios.")
+        embed.set_footer(text="Solo para revisión del staff • PapuCollective")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @guardia.command(name="nota_borrar", description="Elimina una nota interna usando su ID")
@@ -684,8 +664,8 @@ class Seguridad(commands.Cog):
             f"{item.get('id', '?')} - {item.get('status', 'abierto')} - {item.get('title', 'sin titulo')}"
             for item in reversed(incidents[-12:])
         ]
-        embed = discord.Embed(title="Incidentes recientes", description="\n".join(lines)[:3900], color=discord.Color.orange())
-        embed.set_footer(text="Registros internos; registrar un incidente no verifica las alegaciones.")
+        embed = branded_embed(title="🧭 Incidentes recientes", description="\n".join(lines)[:3900], color=discord.Color.orange(), footer="Papu Guard • Registro interno")
+        embed.set_footer(text="Registro interno; los hechos requieren revisión • PapuCollective")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @guardia.command(name="incidente_cerrar", description="Marca un incidente como resuelto")
@@ -762,11 +742,11 @@ class Seguridad(commands.Cog):
             ("anti-repeticion", cfg.get("anti_repeat", {})),
             ("caps", cfg.get("caps_filter", {})),
         ]
-        lines = [f"{name}: {'ON' if settings.get('enabled') else 'OFF'}" for name, settings in filters]
+        lines = [f"{'🟢' if settings.get('enabled') else '⚪'} **{name}** · {'Activado' if settings.get('enabled') else 'Desactivado'}" for name, settings in filters]
         lines.append(f"palabras/frases bloqueadas: {len(cfg.get('blocked_words', []))}")
         lines.append(f"canales excluidos manualmente: {len(cfg.get('excluded_channels', {}))}")
-        embed = discord.Embed(title="Resumen de filtros", description="\n".join(lines), color=discord.Color.blurple())
-        embed.add_field(name="Reportes", value="configurado" if cfg.get("report_channel") else "sin configurar", inline=True)
+        embed = branded_embed(title="🛡️ Resumen de filtros", description="\n".join(lines), color=discord.Color.blurple(), footer="Papu Guard • Configuración")
+        embed.add_field(name="📨 Reportes", value="🟢 Canal configurado" if cfg.get("report_channel") else "⚪ Sin configurar", inline=True)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @guardia.command(name="filtros_reset", description="Desactiva filtros y borra reglas personalizadas con confirmacion")
@@ -858,7 +838,7 @@ class Seguridad(commands.Cog):
         channel = interaction.guild.get_channel(int(channel_id)) if channel_id else None
         if channel is None:
             return await interaction.response.send_message("el canal de reportes no esta configurado o ya no existe.", ephemeral=True)
-        await interaction.response.send_message(f"los reportes llegan a {channel.mention}. revisa que sea privado para miembros normales.", ephemeral=True)
+        await send_feedback(interaction, f"Los reportes llegan a {channel.mention}. Comprueba que el canal sea privado para los miembros normales.", title="Destino de reportes", tone="info")
 
     @guardia.command(name="activar_basico", description="Activa una configuracion moderada de anti-spam, menciones y repeticiones")
     @app_commands.guild_only()
@@ -871,7 +851,7 @@ class Seguridad(commands.Cog):
         cfg["anti_mentions"] = {"enabled": True, "limit": 5}
         cfg["anti_repeat"] = {"enabled": True, "repeats": 4, "window": 15}
         self.save_settings()
-        await interaction.response.send_message("perfil basico activado: 8 mensajes/10 s, maximo 5 menciones y 4 repeticiones/15 s. no activa caps ni filtro de enlaces.", ephemeral=True)
+        await send_feedback(interaction, "8 mensajes/10 s, máximo 5 menciones y 4 repeticiones/15 s. El filtro de mayúsculas y enlaces no se activa con este perfil.", title="Perfil de seguridad básico activado", tone="success")
         await self.security_log(interaction.guild, f"perfil basico activado por {interaction.user}.")
 
     @guardia.command(name="desactivar_automaticos", description="Apaga filtros automaticos sin borrar sus configuraciones")
