@@ -253,22 +253,6 @@ class Moderacion(commands.Cog):
         await interaction.response.send_message(message, ephemeral=True)
         await self.log(interaction.guild, "⚙️ Canal de chat configurado", message)
 
-    async def check_message(self, message):
-        # Analiza cada mensaje de texto cuando el servidor activa la funcion.
-        # El semaforo limita concurrencia, no descarta mensajes.
-        async with self.ai_semaphore:
-            verdict = await self.classify(message.content)
-        if verdict and verdict["flag"] and verdict["confidence"] >= 0.72:
-            await self.log(
-                message.guild,
-                "🛡️ Alerta de moderacion IA",
-                f"Autor: {message.author} ({message.author.id})\nCanal: {message.channel.mention}\n"
-                f"Categoria: {verdict['category']} • confianza estimada: {verdict['confidence']:.0%}\n"
-                f"Motivo sugerido: {verdict['reason']}\nMensaje: {safe_text(message.content, 900)}\n\n"
-                "Alerta automatica: revisar el contexto antes de tomar medidas.",
-                discord.Color.orange(),
-            )
-
     @app_commands.command(name="setlogchannel", description="Elige el canal para los registros del bot")
     @app_commands.checks.has_permissions(administrator=True)
     async def setlogchannel(self, interaction: discord.Interaction, canal: discord.TextChannel):

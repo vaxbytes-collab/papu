@@ -9,7 +9,6 @@ COG_FILES = (
     "utilidades.py",
     "entretenimiento.py",
     "juegos.py",
-    "musica.py",
 )
 DISCORD_GLOBAL_CHAT_INPUT_COMMAND_LIMIT = 100
 
@@ -87,47 +86,41 @@ class CommandRegistryTests(unittest.TestCase):
             f"Found {len(commands)} slash commands; consolidate commands into groups before exceeding the platform limit.",
         )
 
+    def test_music_and_redundant_commands_are_removed(self):
+        names = {name for name, _ in declared_slash_commands()}
+        names.update(name for name, _ in declared_group_commands())
+        removed = {
+            "play", "cola", "pause", "resume", "skip", "stop",
+            "bola8_clasica", "dado_clasico", "moneda_clasica", "ppt_clasico",
+            "caos", "ruleta", "fortuna", "nombre_banda", "nombre_usuario",
+            "pov", "superpoder", "villano", "mood_michi", "verso_michi",
+            "npc", "excusa_gamer", "cancion_inventada", "lore_aleatorio",
+            "traductor_michi", "animal_aleatorio", "objeto_legendario",
+            "mision_secundaria", "rango_gamer", "jefe_final",
+        }
+        self.assertTrue(removed.isdisjoint(names), f"Commands slated for removal remain: {sorted(removed & names)}")
+        self.assertFalse((ROOT / "musica.py").exists(), "The voice-music module should be deleted")
+        self.assertNotIn('"musica"', (ROOT / "main.py").read_text(encoding="utf-8"))
+        requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+        self.assertNotIn("yt-dlp", requirements)
+        self.assertNotIn("PyNaCl", requirements)
+
+    def test_moderation_message_handler_is_defined_once(self):
+        tree = ast.parse((ROOT / "moderacion.py").read_text(encoding="utf-8"))
+        cog = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Moderacion")
+        handlers = [node for node in cog.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "check_message"]
+        self.assertEqual(len(handlers), 1, "Duplicate check_message methods silently shadow one another")
+
     def test_megaupdate_commands_are_present(self):
         names = {name for name, _ in declared_slash_commands()}
         expected = {
-            "antispam",
-            "antiraid",
-            "antienlaces",
-            "antimenciones",
-            "antirepeticion",
-            "filtro_caps",
-            "palabra_bloquear",
-            "palabra_permitir",
-            "palabras_bloqueadas",
-            "canal_reportes",
-            "reportar",
-            "auditoria_permisos",
-            "purge_usuario",
-            "purge_bots",
-            "apodo",
-            "rol_dar",
-            "rol_quitar",
-            "timeout_estado",
-            "adivinanza",
-            "dado_personalizado",
-            "fortuna",
-            "nombre_banda",
-            "nombre_usuario",
-            "pov",
-            "superpoder",
-            "villano",
-            "dato_michi",
-            "reto_sano",
-            "mood_michi",
-            "palabra_aleatoria",
-            "duelo",
-            "completa_frase",
-            "verso_michi",
-            "npc",
-            "excusa_gamer",
-            "cancion_inventada",
-            "lore_aleatorio",
-            "traductor_michi",
+            "antispam", "antiraid", "antienlaces", "antimenciones",
+            "antirepeticion", "filtro_caps", "palabra_bloquear",
+            "palabra_permitir", "palabras_bloqueadas", "canal_reportes",
+            "reportar", "auditoria_permisos", "purge_usuario", "purge_bots",
+            "apodo", "rol_dar", "rol_quitar", "timeout_estado",
+            "adivinanza", "dado_personalizado", "dato_michi", "reto_sano",
+            "palabra_aleatoria", "duelo", "completa_frase",
         }
         names.update(name for name, _ in declared_group_commands())
         self.assertTrue(expected.issubset(names), f"Missing commands: {sorted(expected - names)}")

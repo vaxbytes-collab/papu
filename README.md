@@ -1,6 +1,6 @@
 # Papu 🐈
 
-Bot modular de Discord para PapuCollective: moderacion segura, comunidad, organizacion, minijuegos, mascota persistente y musica por voz.
+Bot modular de Discord para PapuCollective: moderacion segura, comunidad, organizacion, minijuegos y mascota virtual persistente.
 
 ## Modulos
 
@@ -9,7 +9,6 @@ Bot modular de Discord para PapuCollective: moderacion segura, comunidad, organi
 - `seguridad.py`: protecciones configurables, filtros de mensajes, alertas de raid, reportes privados y auditoria de permisos.
 - `utilidades.py`: recordatorios, encuestas, eventos, sugerencias, sorteos e informacion del servidor.
 - `juegos.py`: minijuegos y mascota virtual con monedas, comida, energia y felicidad.
-- `musica.py`: cola y reproduccion por voz con controles slash.
 - `papu_store.py`: almacenamiento PostgreSQL con respaldo local JSON y migracion segura.
 - `tests/`: pruebas unitarias del almacenamiento.
 
@@ -21,8 +20,6 @@ Python 3.10+ recomendado. Instala dependencias:
 python -m pip install -r requirements.txt
 ```
 
-La musica por voz requiere **FFmpeg instalado y accesible desde PATH**, ademas de PyNaCl y yt-dlp (incluidos en requirements). El soporte de fuentes externas puede cambiar y debe respetar las condiciones del servicio de origen y los derechos de autor.
-
 Configura las variables de entorno (por ejemplo, en un archivo `.env` local que NO subas a Git):
 
 - `DISCORD_TOKEN`: token del bot.
@@ -33,7 +30,7 @@ Configura las variables de entorno (por ejemplo, en un archivo `.env` local que 
 - `PAPU_DATA_DIR`: directorio donde se guardan los JSON. En local, por defecto es `data/`; en Render, por defecto es `/var/data`.
 - `PORT`: puerto del endpoint de estado (por defecto 8080).
 
-En Discord Developer Portal activa **Message Content Intent** y **Server Members Intent** cuando uses sus eventos. Invita el bot con permisos minimos necesarios para los modulos activados: ver canales, enviar mensajes, embeds, leer historial, añadir reacciones y los permisos de moderacion/voz que decidas utilizar.
+En Discord Developer Portal activa **Message Content Intent** y **Server Members Intent** cuando uses sus eventos. Invita el bot con permisos minimos necesarios para los modulos activados: ver canales, enviar mensajes, embeds, leer historial, añadir reacciones y los permisos de moderacion que decidas utilizar.
 
 Ejecuta:
 
@@ -107,18 +104,10 @@ Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar lo
 - `/seguridad_estado`: revisa el estado de todas las protecciones. Usa `/setlogchannel` para recibir alertas.
 
 ### Entretenimiento, minijuegos y mascota
-- `/ppt`, `/dado`, `/moneda`, `/8ball`, `/trivia`, `/caos`.
-- `/dilema`, `/adivinanza`, `/dado_personalizado caras`, `/fortuna`: dilemas, acertijos, dados configurables y fortunas de broma.
-- `/nombre_banda`, `/nombre_usuario estilo`, `/pov tema`, `/superpoder`, `/villano`: generadores de nombres, memes y personajes absurdos.
-- `/dato_michi`, `/reto_sano`, `/mood_michi`, `/palabra_aleatoria`: curiosidades gatunas, retos seguros y palabras aleatorias.
-- `/duelo_aleatorio`, `/completa_frase`, `/verso_michi`, `/npc`, `/excusa_gamer`: humor y generadores de frases.
-- `/cancion_inventada`, `/lore_aleatorio`, `/traductor_michi`, `/frase_michi`: títulos de canciones ficticias, lore y lenguaje michi.
+- `/momo`, `/chiste`, `/avatar usuario`, `/dilema`, `/frase_michi`.
+- `/ppt`, `/dado`, `/moneda`, `/8ball`, `/trivia`.
+- `/arcade adivinanza`, `/arcade dado_personalizado caras`, `/arcade dato_michi`, `/arcade reto_sano`, `/arcade palabra_aleatoria`, `/arcade duelo`, `/arcade completa_frase`.
 - `/michi_adoptar [nombre]`, `/michi`, `/michi_cuidar`, `/michi_comida`, `/michi_jugar`.
-- Los comandos heredados de entretenimiento usan `/ppt_clasico`, `/dado_clasico`, `/moneda_clasica` y `/bola8_clasica` para no duplicar nombres.
-
-### Musica
-- `/play consulta`, `/cola`, `/pause`, `/resume`, `/skip`, `/stop`.
-- Los comandos de audio necesitan FFmpeg y permisos para conectar/hablar. Algunas fuentes pueden dejar de funcionar o bloquear la extraccion.
 
 ## Persistencia
 
@@ -143,7 +132,7 @@ La primera inicialización intenta importar los JSON que todavía existan en la 
 - Con `DATABASE_URL`, el historial breve de chat tambien se guarda en PostgreSQL; informa a los miembros de ese almacenamiento y restringe el acceso a la base de datos.
 - Da al bot solo los permisos necesarios. Los comandos de moderacion tienen checks de permisos de Discord; el rol del bot debe estar por encima de los miembros a moderar.
 - Las protecciones anti-spam, anti-raid y anti-invitaciones empiezan desactivadas y requieren que un administrador las active. Anti-raid solo alerta; no expulsa ni banea automaticamente.
-- Los minijuegos de caos son optativos y no deben usarse para acosar, saturar canales o pinguear a todo el servidor.
+- Los retos de `/arcade reto_sano` son optativos y no deben usarse para acosar, saturar canales o pinguear a todo el servidor.
 
 ## Pruebas
 

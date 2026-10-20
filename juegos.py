@@ -128,13 +128,6 @@ class Juegos(commands.Cog):
                                 "No hay datos suficientes :v", "Pregunta de nuevo más tarde."])
         await interaction.response.send_message(f"🎱 **{discord.utils.escape_mentions(pregunta)}**\n{answer}")
 
-    @app_commands.command(name="caos", description="Genera un desafío inocente y opcional")
-    async def caos(self, interaction: discord.Interaction):
-        tasks = ["Habla como robot durante dos mensajes.", "Comparte un dato curioso.", "Inventa un nombre para un planeta.",
-                 "Escribe una frase sin usar la letra A.", "Recomienda una canción.", "Cuenta un chiste malo.",
-                 "Haz una encuesta absurda en el chat.", "Dale un cumplido sincero a alguien (si quiere recibirlo)."]
-        await interaction.response.send_message("🌪️ **Caos controlado:** " + random.choice(tasks) + "\n*Es opcional; nada de spam ni molestar a otros.*")
-
     @app_commands.command(name="trivia", description="Pregunta de cultura general")
     async def trivia(self, interaction: discord.Interaction):
         question, options, answer = random.choice([
