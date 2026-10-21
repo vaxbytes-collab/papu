@@ -1,6 +1,7 @@
 """Cola persistente de memes seleccionados por el staff y publicación diaria."""
 from __future__ import annotations
 
+import re
 import time
 import uuid
 from datetime import datetime
@@ -20,8 +21,11 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 def parse_publish_time(value: str) -> str:
     """Valida y normaliza una hora local en formato HH:MM."""
+    raw = str(value or "").strip()
+    if not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", raw):
+        raise ValueError("La hora debe tener formato HH:MM, por ejemplo 12:30.")
     try:
-        parsed = datetime.strptime(str(value).strip(), "%H:%M")
+        parsed = datetime.strptime(raw, "%H:%M")
     except (TypeError, ValueError) as exc:
         raise ValueError("La hora debe tener formato HH:MM, por ejemplo 12:30.") from exc
     return parsed.strftime("%H:%M")
