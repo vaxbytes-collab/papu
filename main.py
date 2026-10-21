@@ -80,7 +80,7 @@ class PapuBot(commands.Bot):
             ) from exc
 
         # Los cogs estan en la raiz del repositorio, no dentro de una carpeta cogs/.
-        for module in ("moderacion", "seguridad", "entretenimiento", "utilidades", "juegos"):
+        for module in ("moderacion", "seguridad", "entretenimiento", "utilidades", "juegos", "meme_diario"):
             try:
                 await self.load_extension(module)
                 print(f"[OK] Modulo cargado: {module}")

@@ -11,6 +11,7 @@ from psycopg.types.json import Jsonb
 
 PERSISTED_JSON_FILES = (
     "pets.json",
+    "meme_daily.json",
     "utility_settings.json",
     "reminders.json",
     "events.json",

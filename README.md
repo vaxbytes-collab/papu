@@ -41,6 +41,17 @@ python main.py
 
 Los comandos slash se sincronizan al iniciar. Discord puede tardar en mostrar los comandos globales. No despliegues una rama de desarrollo en un servidor principal sin probarla primero.
 
+## Meme diario
+
+El módulo `meme_diario.py` permite que el staff mantenga una cola de memes propios y Papu publique uno al día.
+
+1. Crea un canal visible para la publicación y otro privado para el archivo; Papu necesita ver y enviar mensajes en ambos, además de adjuntar archivos y usar embeds.
+2. Ejecuta `/meme_configurar` con ambos canales, una hora `HH:MM` y una zona IANA (por ejemplo `Europe/Madrid`).
+3. Usa `/meme_subir` con una imagen adjunta y un texto opcional para añadirla a la cola.
+4. `/meme_cola` muestra los pendientes y `/meme_publicar` permite al staff publicar el siguiente de inmediato.
+
+Solo miembros con permiso **Gestionar servidor** pueden administrar la cola. Se aceptan PNG, JPG, GIF y WebP de hasta 8 MB. El sistema guarda las imágenes en el canal de archivo y persiste sus IDs en `meme_daily.json`, para no depender de enlaces temporales de adjuntos. La publicación automática se ejecuta una vez al día por servidor, según la hora y zona configuradas; si no hay memes pendientes, no publica nada.
+
 ## Personalidad y formato del chat de Papu
 
 - Papu es un gato digital/michi grasoso de Sonora y mascota oficial de PapuCollective; su identidad es la de un gato, no solo una referencia ocasional a los michis.
